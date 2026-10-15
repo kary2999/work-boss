@@ -1,0 +1,10 @@
+{
+  "chat_name": "監工群的名稱（僅供備註）",
+  "chat_id": "oc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "owner_open_id": "ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "env_file": "/path/to/.env",
+  "app_id_key": "FEISHU_APP_ID",
+  "app_secret_key": "FEISHU_APP_SECRET",
+  "domain_key": "FEISHU_DOMAIN",
+  "note": "只存非敏感標識。密鑰運行時從 env_file 讀取，不得複製進本倉庫。domain 值含 lark 走 open.larksuite.com，否則走 open.feishu.cn"
+}

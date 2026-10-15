@@ -1,0 +1,15 @@
+{
+  "date": "YYYY-MM-DD",
+  "goal": "今日目標（一兩句）",
+  "items": [
+    {
+      "id": "T002-draw-buttons",
+      "ref": "T002",
+      "title": "任務名稱",
+      "slot": "09:00-10:30",
+      "est_hours": 1.5,
+      "done_std": "完成標準：可驗收的一句話",
+      "subtasks": ["子任務一", "子任務二"]
+    }
+  ]
+}

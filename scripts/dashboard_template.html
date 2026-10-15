@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作日誌看板</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2129;--sub:#5c6370;--line:#e3e6eb;--brand:#f35023;--ok:#00a58c;--ok-bg:#dff6f1;--warn:#b7791f;--warn-bg:#fdf3dc;--bad:#d9363e;--bad-bg:#fde8ea;--info:#2f6fed;--info-bg:#e5eeff;--code:#eef0f4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161d;--card:#1a1f29;--text:#e6e8ec;--sub:#9aa1ad;--line:#2b323f;--ok:#2fd0b5;--ok-bg:#12332d;--warn:#f0c15b;--warn-bg:#3a2f14;--bad:#ff7a82;--bad-bg:#3d1c20;--info:#7da7ff;--info-bg:#1b2a47;--code:#242b37}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,"PingFang TC","PingFang SC","Microsoft YaHei",sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:16px}
+.wrap{max-width:1080px;margin:0 auto}
+h1{margin:0;font-size:20px}
+.meta{color:var(--sub);font-size:12.5px}
+nav{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}
+nav button{border:1px solid var(--line);background:var(--card);color:var(--text);padding:6px 14px;border-radius:16px;cursor:pointer;font-size:14px}
+nav button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+main{padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.num{font-size:28px;font-weight:700;line-height:1.1}
+.lbl{color:var(--sub);font-size:13px}
+.bar{height:8px;border-radius:4px;background:var(--code);overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;background:var(--ok)}
+.tag{display:inline-block;padding:0 8px;border-radius:10px;font-size:12px;line-height:20px;white-space:nowrap}
+.s-todo{background:var(--code);color:var(--sub)}.s-doing{background:var(--info-bg);color:var(--info)}
+.s-review{background:var(--warn-bg);color:var(--warn)}.s-done{background:var(--ok-bg);color:var(--ok)}
+.s-blocked{background:var(--bad-bg);color:var(--bad)}.s-absent{background:var(--bad-bg);color:var(--bad)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.col h3{margin:0 0 8px;font-size:14px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.item:hover{border-color:var(--brand)}
+.item .t{font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+select,input[type=search]{border:1px solid var(--line);background:var(--card);color:var(--text);padding:6px 10px;border-radius:8px;font-size:14px}
+.day{margin:18px 0 6px;font-weight:700;color:var(--sub)}
+.doc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.doc h1,.doc h2,.doc h3{margin:14px 0 6px}
+.doc h1{font-size:18px}.doc h2{font-size:16px}.doc h3{font-size:14.5px}
+.doc code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:12.5px}
+.doc pre{background:var(--code);padding:10px;border-radius:8px;overflow:auto}
+.doc ul{padding-left:20px;margin:6px 0}
+.doc li.cb{list-style:none;margin-left:-20px}
+.empty{color:var(--sub);padding:24px;text-align:center}
+.back{cursor:pointer;color:var(--brand);margin-bottom:10px;display:inline-block}
+@media (max-width:600px){h1{font-size:18px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>工作日誌看板</h1>
+  <div class="meta" id="gen"></div>
+  <nav id="nav">
+    <button data-v="overview" class="on">概覽</button>
+    <button data-v="tasks">任務</button>
+    <button data-v="logs">日誌</button>
+  </nav>
+</div></header>
+<main><div class="wrap" id="view"></div></main>
+<script>
+var DATA = /*__DATA__*/null;
+var ST = {todo:'待辦',doing:'進行中',review:'待驗收',done:'已完成',blocked:'阻塞'};
+var STO = ['todo','doing','review','done','blocked'];
+var state = {view:'overview', openTask:null, openLog:null, agent:'', task:'', q:''};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function inline(s){
+  s=esc(s);
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  return s;
+}
+function md(src){
+  var lines=String(src).replace(/\r/g,'').split('\n'),out=[],list=false,code=false,buf=[];
+  function closeList(){if(list){out.push('</ul>');list=false}}
+  for(var i=0;i<lines.length;i++){
+    var l=lines[i];
+    if(/^```/.test(l)){
+      if(code){out.push('<pre>'+esc(buf.join('\n'))+'</pre>');buf=[];code=false}
+      else{closeList();code=true}
+      continue;
+    }
+    if(code){buf.push(l);continue}
+    var m;
+    if((m=l.match(/^(#{1,3})\s+(.*)$/))){closeList();out.push('<h'+m[1].length+'>'+inline(m[2])+'</h'+m[1].length+'>');continue}
+    if((m=l.match(/^\s*- \[([ xX])\]\s+(.*)$/))){
+      if(!list){out.push('<ul>');list=true}
+      out.push('<li class="cb">'+(m[1]==' '?'☐ ':'☑ ')+inline(m[2])+'</li>');continue;
+    }
+    if((m=l.match(/^\s*[-*]\s+(.*)$/))){
+      if(!list){out.push('<ul>');list=true}
+      out.push('<li>'+inline(m[1])+'</li>');continue;
+    }
+    if(/^\s*$/.test(l)){closeList();continue}
+    closeList();out.push('<p>'+inline(l)+'</p>');
+  }
+  closeList();
+  if(code)out.push('<pre>'+esc(buf.join('\n'))+'</pre>');
+  return out.join('\n');
+}
+function pct(a,b){return b?Math.round(a*100/b):0}
+function tag(st){return '<span class="tag s-'+st+'">'+(ST[st]||esc(st))+'</span>'}
+function overview(){
+  var t=DATA.tasks,l=DATA.logs;
+  var cnt={};STO.forEach(function(s){cnt[s]=0});t.forEach(function(x){cnt[x.status]=(cnt[x.status]||0)+1});
+  var ad=t.reduce(function(a,x){return a+x.done},0),at=t.reduce(function(a,x){return a+x.total},0);
+  var today=new Date();var ds=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2)+'-'+('0'+today.getDate()).slice(-2);
+  var todayLogs=l.filter(function(x){return x.date===ds}).length;
+  var absent=l.filter(function(x){return x.absent});
+  var h='<div class="grid">'+
+   '<div class="card"><div class="num">'+pct(cnt.done,t.length)+'%</div><div class="lbl">任務完成（'+cnt.done+'/'+t.length+'）</div><div class="bar"><i style="width:'+pct(cnt.done,t.length)+'%"></i></div></div>'+
+   '<div class="card"><div class="num">'+pct(ad,at)+'%</div><div class="lbl">驗收項完成（'+ad+'/'+at+'）</div><div class="bar"><i style="width:'+pct(ad,at)+'%"></i></div></div>'+
+   '<div class="card"><div class="num">'+todayLogs+'</div><div class="lbl">今日日誌（'+ds+'）</div></div>'+
+   '<div class="card"><div class="num" style="color:'+(absent.length?'var(--bad)':'inherit')+'">'+absent.length+'</div><div class="lbl">旷工記錄</div></div>'+
+   '</div>';
+  h+='<div class="card" style="margin-bottom:16px"><div class="row">'+STO.map(function(s){return tag(s)+' '+cnt[s]}).join(' &nbsp; ')+'</div></div>';
+  h+='<h3>任務進度</h3>';
+  if(!t.length)h+='<div class="empty">還沒有任務卡（tasks/）</div>';
+  t.forEach(function(x){
+    h+='<div class="item" data-task="'+esc(x.file)+'"><div class="row"><span class="t">'+esc(x.id)+' '+esc(x.title)+'</span>'+tag(x.status)+
+       (x.due?'<span class="meta">截止 '+esc(x.due)+'</span>':'')+'</div>'+
+       '<div class="bar"><i style="width:'+pct(x.done,x.total)+'%"></i></div><div class="meta">'+x.done+' / '+x.total+' 項驗收'+(x.owner?' ｜ 負責：'+esc(x.owner):'')+'</div></div>';
+  });
+  h+='<h3>最近日誌</h3>';
+  if(!l.length)h+='<div class="empty">還沒有日誌（worklog/）</div>';
+  l.slice(0,5).forEach(function(x){h+=logItem(x)});
+  if(absent.length){h+='<h3>旷工記錄</h3>';absent.forEach(function(x){h+=logItem(x)})}
+  return h;
+}
+function logItem(x){
+  var title=(x.body.match(/^#\s+(.*)$/m)||[0,x.file])[1];
+  return '<div class="item" data-log="'+esc(x.file)+'"><div class="row"><span class="t">'+esc(title)+'</span>'+
+    (x.absent?'<span class="tag s-absent">旷工</span>':'')+
+    '</div><div class="meta">'+esc(x.date)+' '+esc(x.time)+' ｜ '+esc(x.agent)+' ｜ '+esc(x.task)+'</div></div>';
+}
+function tasksView(){
+  if(state.openTask){
+    var x=DATA.tasks.filter(function(t){return t.file===state.openTask})[0];
+    if(x)return '<span class="back" id="back">← 返回</span><div class="card" style="margin-bottom:12px"><div class="row"><b>'+esc(x.id)+' '+esc(x.title)+'</b>'+tag(x.status)+'</div>'+
+      '<div class="bar"><i style="width:'+pct(x.done,x.total)+'%"></i></div><div class="meta">'+x.done+'/'+x.total+' 項驗收 ｜ 截止 '+esc(x.due||'—')+' ｜ 依賴 '+esc(x.blocked_by||'—')+' ｜ 負責 '+esc(x.owner||'—')+'</div></div><div class="doc">'+md(x.body)+'</div>';
+  }
+  if(!DATA.tasks.length)return '<div class="empty">還沒有任務卡（tasks/）</div>';
+  var h='<div class="cols">';
+  STO.forEach(function(s){
+    var list=DATA.tasks.filter(function(t){return t.status===s});
+    h+='<div class="col"><h3>'+tag(s)+' '+list.length+'</h3>';
+    list.forEach(function(x){
+      h+='<div class="item" data-task="'+esc(x.file)+'"><div class="t">'+esc(x.id)+' '+esc(x.title)+'</div><div class="bar"><i style="width:'+pct(x.done,x.total)+'%"></i></div><div class="meta">'+x.done+'/'+x.total+(x.due?' ｜ '+esc(x.due):'')+'</div></div>';
+    });
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+function logsView(){
+  if(state.openLog){
+    var x=DATA.logs.filter(function(l){return l.file===state.openLog})[0];
+    if(x)return '<span class="back" id="back">← 返回</span><div class="meta" style="margin-bottom:8px">'+esc(x.file)+'</div><div class="doc">'+md(x.body)+'</div>';
+  }
+  var agents={},tasks={};DATA.logs.forEach(function(l){agents[l.agent]=1;tasks[l.task]=1});
+  function opts(o,sel){return '<option value="">全部</option>'+Object.keys(o).sort().map(function(k){return '<option'+(k===sel?' selected':'')+'>'+esc(k)+'</option>'}).join('')}
+  var h='<div class="filters"><select id="fa">'+opts(agents,state.agent)+'</select><select id="ft">'+opts(tasks,state.task)+'</select>'+
+        '<input type="search" id="fq" placeholder="搜尋日誌內容" value="'+esc(state.q)+'"></div>';
+  var list=DATA.logs.filter(function(l){
+    return (!state.agent||l.agent===state.agent)&&(!state.task||l.task===state.task)&&(!state.q||l.body.indexOf(state.q)>=0);
+  });
+  if(!list.length)return h+'<div class="empty">沒有符合的日誌</div>';
+  var last='';
+  list.forEach(function(x){if(x.date!==last){h+='<div class="day">'+esc(x.date||'未知日期')+'</div>';last=x.date}h+=logItem(x)});
+  return h;
+}
+function render(){
+  document.getElementById('gen').textContent='資料生成於 '+DATA.generated+'（重新執行 scripts/build_dashboard.py 後刷新頁面）';
+  Array.prototype.forEach.call(document.querySelectorAll('#nav button'),function(b){b.classList.toggle('on',b.dataset.v===state.view)});
+  var v=document.getElementById('view');
+  v.innerHTML=state.view==='overview'?overview():state.view==='tasks'?tasksView():logsView();
+  Array.prototype.forEach.call(v.querySelectorAll('[data-task]'),function(e){e.onclick=function(){state.view='tasks';state.openTask=e.dataset.task;render();scrollTo(0,0)}});
+  Array.prototype.forEach.call(v.querySelectorAll('[data-log]'),function(e){e.onclick=function(){state.view='logs';state.openLog=e.dataset.log;render();scrollTo(0,0)}});
+  var b=document.getElementById('back');if(b)b.onclick=function(){state.openTask=null;state.openLog=null;render()};
+  var fa=document.getElementById('fa');if(fa){
+    fa.onchange=function(){state.agent=fa.value;render()};
+    document.getElementById('ft').onchange=function(){state.task=this.value;render()};
+    var q=document.getElementById('fq');q.onchange=function(){state.q=q.value;render()};
+  }
+}
+document.getElementById('nav').onclick=function(e){
+  var v=e.target.dataset&&e.target.dataset.v;if(!v)return;
+  state.view=v;state.openTask=null;state.openLog=null;render();
+};
+render();
+</script>
+</body>
+</html>

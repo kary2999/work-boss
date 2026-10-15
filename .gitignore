@@ -1,0 +1,22 @@
+# ---- 私有資料：絕不入庫 ----
+worklog/*
+!worklog/_TEMPLATE.md
+.supervisor/
+config/lark.json
+tasks/*
+!tasks/_TEMPLATE.md
+plans/*
+!plans/_TEMPLATE.json
+PROJECT.md
+notes/
+
+# ---- 示範專案的產出（不是監工系統本身）----
+docs/dashboard.html
+docs/axure-master-library-plan.html
+docs/three-day-plan.html
+docs/master-spec.html
+
+# ---- 其他 ----
+__pycache__/
+*.pyc
+.DS_Store
