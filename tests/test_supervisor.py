@@ -83,8 +83,8 @@ class PureTests(unittest.TestCase):
 
     def test_build_next_plan_carries_first_then_backlog_within_cap(self):
         res = [
-            {"id": "a", "guid": "g1", "summary": "[T001] 09:00–10:00 甲", "est_hours": 2.0, "completed": False,
-             "reasons": ["需求不清"], "subtasks_open": [{"guid": "s1", "summary": "子甲"}]},
+            {"id": "a", "guid": "g1", "url": "https://t/g1", "summary": "[T001] 09:00–10:00 甲", "est_hours": 2.0,
+             "completed": False, "reasons": ["需求不清"], "subtasks_open": [{"guid": "s1", "summary": "子甲"}]},
             {"id": "b", "guid": "g2", "summary": "[T001] 10:00–11:00 乙", "est_hours": 1.0, "completed": True,
              "reasons": [], "subtasks_open": []},
         ]
@@ -98,6 +98,7 @@ class PureTests(unittest.TestCase):
         self.assertEqual(titles, ["甲", "放得下"])  # 完成項不順延；T001 已在順延中不重複；T003 超出上限
         self.assertTrue(plan["items"][0]["carried"])
         self.assertEqual(plan["items"][0]["guid"], "g1")
+        self.assertEqual(plan["items"][0]["url"], "https://t/g1")
         self.assertEqual(plan["items"][0]["carry_reason"], "需求不清")
         self.assertEqual(plan["deferred"], ["T003"])
         self.assertEqual(plan["total_hours"], 5.0)

@@ -116,7 +116,7 @@ def build_next_plan(results, backlog, next_day, cap=DAY_CAP_HOURS):
             "ref": ref, "title": title, "est_hours": r.get("est_hours", 1.0),
             "done_std": r.get("done_std", ""), "carried": True,
             "carry_reason": "；".join(r["reasons"]) if r["reasons"] else "",
-            "guid": r["guid"], "subtasks": subs,
+            "guid": r["guid"], "url": r.get("url", ""), "subtasks": subs,
         })
     total = sum(float(c["est_hours"]) for c in carried)
     carried_refs = {c["ref"] for c in carried if c["ref"]}
