@@ -38,6 +38,10 @@ cp plans/_TEMPLATE.json plans/$(date +%F).json   # 寫今天的計畫
 python3 scripts/supervisor.py morning --dry-run   # 乾跑
 bash scripts/install_launchd.sh                  # 安裝定時任務
 ```
+## 结合Lark任务 进行排期
+
+<img width="429" height="522" alt="image" src="https://github.com/user-attachments/assets/d27e2a73-eb22-4409-8a0f-16648a5d6e0a" />
+<img width="741" height="742" alt="image" src="https://github.com/user-attachments/assets/4a3dcebc-ce49-4b64-9955-93ed55b18bdf" />
 
 ## 目錄
 
