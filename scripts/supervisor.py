@@ -359,7 +359,8 @@ def cmd_morning(day, client, dry, force=False):
         entry = {"id": it["id"], "summary": summary, "slot": slot_label, "est_hours": it.get("est_hours", 1.0),
                  "done_std": it.get("done_std", ""), "carried": bool(it.get("carried")), "subtasks": []}
         if it.get("guid"):  # 順延項：沿用原任務，只改期，不重複建立
-            client.task_update(it["guid"], summary=summary, desc=desc, start=start, due=due)
+            # 順延項只改標題與起止時間，不動描述：描述裡可能有人或 agent 補充的規範與說明
+            client.task_update(it["guid"], summary=summary, start=start, due=due)
             entry["guid"], entry["url"] = it["guid"], it.get("url", "")
             for s in it.get("subtasks", []):
                 if isinstance(s, dict) and s.get("guid"):

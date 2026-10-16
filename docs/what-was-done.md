@@ -60,4 +60,5 @@
 
 | 日期 | 改動 | 驗證 | 風險 |
 |---|---|---|---|
+| 2026-10-16 | 修正：順延項改期時不再覆蓋任務描述（描述裡可能有人補充的規範）；順延項帶任務 url | 15 個單元測試通過；真實 Lark 只讀試算 | 順延項的描述不會自動更新，需要時人工改 |
 | 2026-10-16 | 新增 `scripts/supervisor.py`（morning／evening／chase／close／plan-carry／status）、`tests/`、`launchd/`、`install_launchd.sh`、`check_private.sh`；`lark_ops.py` 增加 `task-update`、`subtask-create`、`task-comments`、`card`、`chats` | 15 個單元測試通過；`--dry-run` 乾跑通過；以真實 Lark 只讀試算次日計畫 | launchd 路徑未在真實排程下跑完整一天；卡片排版需人工確認 |
