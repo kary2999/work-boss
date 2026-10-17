@@ -82,5 +82,17 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(ws.demote("###### x", by=5), "######### x")
 
 
+class CleanBlocksTests(unittest.TestCase):
+    def test_strips_parent_id_and_merge_info(self):
+        src = [{"block_id": "a", "parent_id": "", "block_type": 2},
+               {"block_id": "t", "parent_id": "", "block_type": 31,
+                "table": {"property": {"row_size": 1, "merge_info": [{}]}}}]
+        out = ws.clean_blocks(src)
+        self.assertNotIn("parent_id", out[0])
+        self.assertNotIn("merge_info", out[1]["table"]["property"])
+        self.assertEqual(out[1]["table"]["property"]["row_size"], 1)
+        self.assertIn("merge_info", src[1]["table"]["property"])  # 不改原数据
+
+
 if __name__ == "__main__":
     unittest.main()

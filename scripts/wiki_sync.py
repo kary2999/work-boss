@@ -192,6 +192,20 @@ def ensure_page(L, token, cfg):
     return n["obj_token"], n["node_token"]
 
 
+def clean_blocks(blocks):
+    """convert 返回的块不能直接给 descendant：要去掉 parent_id 与表格的 merge_info，否则报 1770001。"""
+    out = []
+    for b in blocks:
+        b = dict(b)
+        b.pop("parent_id", None)
+        if b.get("block_type") == 31 and isinstance(b.get("table"), dict):
+            prop = dict(b["table"].get("property") or {})
+            prop.pop("merge_info", None)
+            b["table"] = dict(b["table"], property=prop)
+        out.append(b)
+    return out
+
+
 def publish(chunks, cfg, sleep=0.4):
     L = _lark()
     token = L.token()
@@ -211,7 +225,7 @@ def publish(chunks, cfg, sleep=0.4):
         if not first:
             continue
         _check(L.call("POST", base + "/blocks/%s/descendant?document_revision_id=-1" % doc,
-                      {"children_id": first, "descendants": blocks, "index": pos}, token), "写入页面")
+                      {"children_id": first, "descendants": clean_blocks(blocks), "index": pos}, token), "写入页面")
         pos += len(first)
         time.sleep(sleep)
     return doc, node, pos
