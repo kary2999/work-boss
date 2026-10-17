@@ -25,6 +25,7 @@
 |---|---|
 | 为什么这样设计、名词定义 | [docs/concept.md](docs/concept.md) |
 | 一天里你要做什么 | [docs/usage.md](docs/usage.md) |
+| 开发心得、踩坑、完整使用说明 | [docs/devlog-and-guide.md](docs/devlog-and-guide.md) |
 | agent 的协作规则 | [AGENTS.md](AGENTS.md) |
 | 文件格式与判定规则 | [docs/data-contract.md](docs/data-contract.md) |
 | 安装、launchd、权限 | [docs/setup-macos.md](docs/setup-macos.md) |
