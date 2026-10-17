@@ -7,6 +7,8 @@
 - 排程：macOS launchd，**確定性腳本**，不依賴任何 LLM
 - 協作：計畫、任務、日誌都是倉庫檔案，任何 agent 讀寫檔案即可參與
 - 原則：證據優先——完成只認 Lark 任務的勾選，監工從不替你宣稱完成
+- 本地跟得上 Lark：進度每次運行都寫回本地（任務卡、進度快照、看板自動刷新），次日計畫從白天就持續維護
+- 需求不足會主動要：計畫工時低於下限，監工在 Lark 問你要需求，回覆卡片就能補
 
 ## 一圖看懂
 
@@ -47,7 +49,7 @@ bash scripts/install_launchd.sh                  # 安裝定時任務
 
 ```
 AGENTS.md  CLAUDE.md          協作約定（CLAUDE.md 引用 AGENTS.md）
-scripts/   supervisor.py      監工執行器（morning/evening/chase/close/plan-carry/status）
+scripts/   supervisor.py      監工執行器（morning/evening/chase/close/sync/plan-carry/status）
            lark_ops.py        Lark REST 工具（發卡片、建任務、讀回覆…）
            build_dashboard.py 本地看板生成
            install_launchd.sh launchd 安裝／卸載（含自測）

@@ -60,10 +60,18 @@
 | 順延後出現重複任務 | 次日計畫檔是別的 agent 寫的、未帶 `guid`；讓該 agent 併入順延項，或用 `plan-carry` 對照 rollover 日誌手工補 |
 | 任務列表被子任務刷屏 | 子任務默認不指派；若是舊任務，可在 Lark 內手動取消指派 |
 | 旷工判定可疑 | 看 rollover／absent 日誌裡的追問次數；少於 7 次通常是電腦休眠 |
+| 看板或任務卡進度沒變 | 看板頂部「資料生成於」＝最近一次監工運行時間；手動 `python3 scripts/supervisor.py sync` 立刻刷新。若排程沒在跑，見 docs/setup-macos.md；`build_dashboard.py` 單獨運行**不會**讀 Lark，只重排現有資料 |
+| 誤報「需求不足」 | 先查任務卡有沒有 `est_hours`；再看 `plans/` 當日 `total_hours` 與看板「計畫」分頁；必要時調 `min_plan_hours` |
+| 一直沒收到「需求不足」卡片 | 計畫工時是否真的低於下限；`.supervisor/asks.json` 的 `count`／`last` 是否觸發了限流（每天 3 次、間隔 90 分鐘） |
+| 回覆了需求卻沒進計畫 | 必須對**那張卡片**點「回覆」（不是在群裡發新消息）；下次運行才讀取；若目標日計畫是別人寫的（`generated_by` 非 supervisor），需求會被追加在後面而不是改動既有項 |
+| `sync` 很慢（首次） | 首次會回填所有歷史日的進度，Lark 單次請求約 1 秒；之後每次只讀當天，約 15～40 秒 |
 
 ## 7. 不要做的事
 
-- 不要手改 `.supervisor/*.json`（除非按「重置某一天」）。
+- 不要手改 `.supervisor/*.json`（除非按「重置某一天」）。唯一的例外是修正由資料錯誤造成的壞狀態，且要在 `docs/what-was-done.md` 留記錄。
+- 不要把任務卡的 `status` 手動改成 `done` 以外的「自動值」：`progress`／`status` 由監工回寫，手改會在下次同步被覆蓋或造成混亂（想把 `blocked`、`done` 設上去是可以的，監工不會動它們）。
+- 不要編輯 `generated_by` 為 `supervisor` 的計畫檔而不先改掉 `generated_by`，否則下次同步會洗掉修改。
+- 不要新增缺 `est_hours` 的任務卡：缺省 1h 會讓需求充足性判斷失真。
 - 不要在腳本裡寫死 chat_id、open_id、密鑰。
 - 不要為了「更即時」給共用機器人開長連接或改回調。
 - 不要讓監工去「判斷工作做得好不好」。

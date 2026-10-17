@@ -47,7 +47,7 @@ python3 scripts/supervisor.py morning --dry-run         # 只印出將建立的�
 ## 4. 安裝 launchd
 
 ```bash
-bash scripts/install_launchd.sh            # 安裝 morning / evening / chase / close
+bash scripts/install_launchd.sh            # 安裝 morning / evening / chase / close / sync
 launchctl list | grep workboss             # 確認已載入
 bash scripts/install_launchd.sh --uninstall   # 卸載
 ```
@@ -58,6 +58,9 @@ bash scripts/install_launchd.sh --uninstall   # 卸載
 | `com.workboss.evening` | 每天 20:30 |
 | `com.workboss.chase` | 每天 21:00、21:30、22:00、22:30、23:00、23:30 |
 | `com.workboss.close` | 每天 00:00（收尾昨日） |
+| `com.workboss.sync` | 每天 10:05 到 19:05，每小時一次（同步進度、維護次日計畫、刷新看板） |
+
+可選配置（`config/lark.json`）：`"min_plan_hours": 4`——當日計畫低於這個工時就在 Lark 主動要需求，缺省 4。也可用環境變數 `WORK_BOSS_MIN_HOURS` 臨時覆蓋。
 
 日誌在 `.supervisor/logs/*.log`。Mac 睡眠時錯過的觸發會在喚醒後補跑。
 
@@ -77,6 +80,7 @@ bash scripts/install_launchd.sh --uninstall   # 卸載
 ## 6. 補產出與手動操作
 
 ```bash
+python3 scripts/supervisor.py sync                          # 立刻同步：進度→本地、任務卡、次日計畫、看板（約 15～40 秒；首次會回填歷史日，較久）
 python3 scripts/supervisor.py plan-carry --date 2026-10-15    # 只生成「順延＋次日計畫」，不發消息
 python3 scripts/supervisor.py morning --date 2026-10-16 --force
 python3 scripts/supervisor.py close --date 2026-10-15 --dry-run

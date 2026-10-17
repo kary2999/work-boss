@@ -1,5 +1,5 @@
 #!/bin/bash
-# 安裝 work-boss 的 4 個 launchd 定時任務（用戶級，不需要 sudo）。
+# 安裝 work-boss 的 5 個 launchd 定時任務（用戶級，不需要 sudo）。
 # 用法：scripts/install_launchd.sh            安裝（已存在則覆蓋並重載）
 #       scripts/install_launchd.sh --uninstall 卸載
 set -euo pipefail
@@ -9,7 +9,7 @@ PY="${PYTHON:-/usr/bin/python3}"
 LOG="$ROOT/.supervisor/logs"
 AGENTS="$HOME/Library/LaunchAgents"
 UID_N="$(id -u)"
-JOBS="morning evening chase close"
+JOBS="morning evening chase close sync"
 
 if [ "${1:-}" = "--uninstall" ]; then
   for job in $JOBS; do

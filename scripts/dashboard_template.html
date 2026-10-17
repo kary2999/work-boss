@@ -54,7 +54,9 @@ select,input[type=search]{border:1px solid var(--line);background:var(--card);co
   <div class="meta" id="gen"></div>
   <nav id="nav">
     <button data-v="overview" class="on">概覽</button>
-    <button data-v="tasks">任務</button>
+    <button data-v="progress">進度</button>
+    <button data-v="plans">計畫</button>
+    <button data-v="tasks">任務卡</button>
     <button data-v="logs">日誌</button>
   </nav>
 </div></header>
@@ -101,31 +103,84 @@ function md(src){
 }
 function pct(a,b){return b?Math.round(a*100/b):0}
 function tag(st){return '<span class="tag s-'+st+'">'+(ST[st]||esc(st))+'</span>'}
+function nextDay(d){var x=new Date(d+'T00:00:00');x.setDate(x.getDate()+1);return x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2)}
+function planFor(d){return DATA.plans.filter(function(p){return p.date===d})[0]}
+function planChip(p){
+  if(!p)return '<span class="tag s-blocked">沒有計畫檔</span>';
+  var low=p.total_hours<DATA.min_hours, over=p.total_hours>7.5;
+  return (low?'<span class="tag s-blocked">需求不足</span> ':(over?'<span class="tag s-review">超載（>7.5h）</span> ':'<span class="tag s-done">需求充足</span> '))+
+    (p.draft?'<span class="tag s-review">草案</span> ':'<span class="tag s-doing">定稿</span> ');
+}
 function overview(){
   var t=DATA.tasks,l=DATA.logs;
   var cnt={};STO.forEach(function(s){cnt[s]=0});t.forEach(function(x){cnt[x.status]=(cnt[x.status]||0)+1});
-  var ad=t.reduce(function(a,x){return a+x.done},0),at=t.reduce(function(a,x){return a+x.total},0);
-  var today=new Date();var ds=today.getFullYear()+'-'+('0'+(today.getMonth()+1)).slice(-2)+'-'+('0'+today.getDate()).slice(-2);
+  var ds=DATA.today, tmr=nextDay(ds);
   var todayLogs=l.filter(function(x){return x.date===ds}).length;
   var absent=l.filter(function(x){return x.absent});
+  var pg=DATA.progress[ds], tp=planFor(tmr), cp=planFor(ds);
   var h='<div class="grid">'+
-   '<div class="card"><div class="num">'+pct(cnt.done,t.length)+'%</div><div class="lbl">任務完成（'+cnt.done+'/'+t.length+'）</div><div class="bar"><i style="width:'+pct(cnt.done,t.length)+'%"></i></div></div>'+
-   '<div class="card"><div class="num">'+pct(ad,at)+'%</div><div class="lbl">驗收項完成（'+ad+'/'+at+'）</div><div class="bar"><i style="width:'+pct(ad,at)+'%"></i></div></div>'+
+   '<div class="card"><div class="num">'+(pg?pg.main_done+' / '+pg.main_total:'—')+'</div><div class="lbl">今日主任務（Lark 勾選）</div>'+
+     '<div class="bar"><i style="width:'+(pg?pct(pg.main_done,pg.main_total):0)+'%"></i></div><div class="meta">'+(pg?('子任務 '+pg.sub_done+' / '+pg.sub_total+' ｜ 同步於 '+esc(pg.updated)):'今日尚無同步')+'</div></div>'+
+   '<div class="card"><div class="num">'+(tp?tp.total_hours+'h':'—')+'</div><div class="lbl">明日計畫工時（下限 '+DATA.min_hours+'h）</div><div class="meta" style="margin-top:6px">'+planChip(tp)+(tp?'':'')+'</div></div>'+
    '<div class="card"><div class="num">'+todayLogs+'</div><div class="lbl">今日日誌（'+ds+'）</div></div>'+
    '<div class="card"><div class="num" style="color:'+(absent.length?'var(--bad)':'inherit')+'">'+absent.length+'</div><div class="lbl">旷工記錄</div></div>'+
    '</div>';
-  h+='<div class="card" style="margin-bottom:16px"><div class="row">'+STO.map(function(s){return tag(s)+' '+cnt[s]}).join(' &nbsp; ')+'</div></div>';
-  h+='<h3>任務進度</h3>';
+  if(tp&&tp.total_hours<DATA.min_hours){
+    var ak=DATA.asks[tmr];
+    h+='<div class="card" style="margin-bottom:16px;border-color:var(--bad)"><b>明日需求不足</b>：已排 '+tp.items.length+' 項、約 '+tp.total_hours+'h，低於下限 '+DATA.min_hours+'h。'+
+       (ak?'監工已在 Lark 要過 '+ak.count+' 次需求。':'監工還沒要過需求。')+'<div class="meta">補法：回覆 Lark 的「需求不足」卡片（每行一條，可寫 2h）／在 tasks/ 新增任務卡（寫 est_hours）／讓 agent 寫 plans/'+tmr+'.json</div></div>';
+  }
+  if(DATA.needs.length){
+    h+='<div class="card" style="margin-bottom:16px"><b>你補充的需求</b>（已併入計畫）：'+DATA.needs.map(function(n){return esc(n.title)+'（'+n.est_hours+'h → '+esc(n.target)+'）'}).join('、')+'</div>';
+  }
+  h+='<div class="card" style="margin-bottom:16px"><div class="row">任務卡：'+STO.map(function(s){return tag(s)+' '+cnt[s]}).join(' &nbsp; ')+'</div></div>';
+  if(cp){h+='<h3>今日計畫 '+planChip(cp)+'</h3>'+planTable(cp)}
+  if(tp){h+='<h3>明日計畫 '+planChip(tp)+'</h3>'+planTable(tp)}
+  h+='<h3>任務卡</h3>';
   if(!t.length)h+='<div class="empty">還沒有任務卡（tasks/）</div>';
   t.forEach(function(x){
     h+='<div class="item" data-task="'+esc(x.file)+'"><div class="row"><span class="t">'+esc(x.id)+' '+esc(x.title)+'</span>'+tag(x.status)+
+       (x.progress?'<span class="meta">Lark 進度 '+esc(x.progress)+'</span>':'')+
        (x.due?'<span class="meta">截止 '+esc(x.due)+'</span>':'')+'</div>'+
-       '<div class="bar"><i style="width:'+pct(x.done,x.total)+'%"></i></div><div class="meta">'+x.done+' / '+x.total+' 項驗收'+(x.owner?' ｜ 負責：'+esc(x.owner):'')+'</div></div>';
+       '<div class="meta">驗收項 '+x.done+' / '+x.total+(x.owner?' ｜ 負責：'+esc(x.owner):'')+'</div></div>';
   });
   h+='<h3>最近日誌</h3>';
   if(!l.length)h+='<div class="empty">還沒有日誌（worklog/）</div>';
   l.slice(0,5).forEach(function(x){h+=logItem(x)});
   if(absent.length){h+='<h3>旷工記錄</h3>';absent.forEach(function(x){h+=logItem(x)})}
+  return h;
+}
+function planTable(p){
+  if(!p.items.length)return '<div class="empty">這份計畫沒有任何項目</div>';
+  var h='<div class="card"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><tr><th align="left">時段</th><th align="left">任務</th><th align="left">估時</th><th align="left">子任務</th><th align="left">備註</th></tr>';
+  p.items.forEach(function(i){
+    var note=[];if(i.carried)note.push('順延'+(i.reason?'：'+esc(i.reason):''));if(i.req)note.push('你補充的需求');
+    h+='<tr><td>'+esc(i.slot)+'</td><td>'+(i.ref?'['+esc(i.ref)+'] ':'')+esc(i.title)+'</td><td>'+i.est_hours+'h</td><td>'+i.subs+'</td><td>'+note.join('；')+'</td></tr>';
+  });
+  h+='</table><div class="meta" style="margin-top:6px">合計 '+p.total_hours+'h ｜ 來源：'+esc(p.generated_by)+(p.deferred.length?' ｜ 未排入：'+esc(p.deferred.join('、')):'')+'</div></div>';
+  return h;
+}
+function progressView(){
+  var days=Object.keys(DATA.progress).sort().reverse();
+  if(!days.length)return '<div class="empty">還沒有進度同步。執行 scripts/supervisor.py sync 或等排程。</div>';
+  var h='';
+  days.forEach(function(d){
+    var g=DATA.progress[d];
+    h+='<h3>'+esc(d)+' '+(g.absent?'<span class="tag s-absent">旷工</span> ':'')+'<span class="tag '+(g.main_done===g.main_total?'s-done':'s-doing')+'">'+g.main_done+' / '+g.main_total+' 主任務</span> <span class="meta">子任務 '+g.sub_done+' / '+g.sub_total+' ｜ 催促 '+g.reminders+' 次 ｜ 同步於 '+esc(g.updated)+'</span></h3>';
+    h+='<div class="card"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><tr><th align="left">狀態</th><th align="left">時段</th><th align="left">任務</th><th align="left">子任務</th><th align="left">你寫的原因</th></tr>';
+    g.items.forEach(function(i){
+      h+='<tr><td>'+(i.completed?'✅':'⬜')+'</td><td>'+esc(i.slot||'')+'</td><td>'+(i.ref?'['+esc(i.ref)+'] ':'')+esc(i.title)+'</td><td>'+i.subs_done+'/'+i.subs_total+'</td><td>'+esc((i.reasons||[]).join('；'))+'</td></tr>';
+    });
+    h+='</table></div>';
+  });
+  return h;
+}
+function plansView(){
+  if(!DATA.plans.length)return '<div class="empty">還沒有計畫檔（plans/）</div>';
+  var h='<div class="meta" style="margin-bottom:8px">工時下限 '+DATA.min_hours+'h；低於下限的日子會在 Lark 主動要需求。</div>';
+  DATA.plans.forEach(function(p){
+    h+='<h3>'+esc(p.date)+(p.date===DATA.today?'（今日）':'')+' '+planChip(p)+'</h3>'+planTable(p);
+  });
   return h;
 }
 function logItem(x){
@@ -173,7 +228,7 @@ function render(){
   document.getElementById('gen').textContent='資料生成於 '+DATA.generated+'（重新執行 scripts/build_dashboard.py 後刷新頁面）';
   Array.prototype.forEach.call(document.querySelectorAll('#nav button'),function(b){b.classList.toggle('on',b.dataset.v===state.view)});
   var v=document.getElementById('view');
-  v.innerHTML=state.view==='overview'?overview():state.view==='tasks'?tasksView():logsView();
+  v.innerHTML=state.view==='overview'?overview():state.view==='progress'?progressView():state.view==='plans'?plansView():state.view==='tasks'?tasksView():logsView();
   Array.prototype.forEach.call(v.querySelectorAll('[data-task]'),function(e){e.onclick=function(){state.view='tasks';state.openTask=e.dataset.task;render();scrollTo(0,0)}});
   Array.prototype.forEach.call(v.querySelectorAll('[data-log]'),function(e){e.onclick=function(){state.view='logs';state.openLog=e.dataset.log;render();scrollTo(0,0)}});
   var b=document.getElementById('back');if(b)b.onclick=function(){state.openTask=null;state.openLog=null;render()};

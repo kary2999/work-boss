@@ -214,27 +214,36 @@ def main():
         print(json.dumps({"guid": sub.get("guid"), "url": sub.get("url")}, ensure_ascii=False))
         return
     if a[0] == "task-comments" and len(a) >= 2:
-        for g in a[1:]:
+        from concurrent.futures import ThreadPoolExecutor
+
+        def one_comments(g):
             r = call("GET", "/open-apis/task/v2/comments?resource_type=task&resource_id=%s&page_size=50&user_id_type=open_id" % g, token=t)
             if r.get("code") != 0:
-                print(json.dumps({"guid": g, "error": "code=%s msg=%s" % (r.get("code"), r.get("msg"))}, ensure_ascii=False))
-                continue
+                return [{"guid": g, "error": "code=%s msg=%s" % (r.get("code"), r.get("msg"))}]
+            rows = []
             for c in (r.get("data") or {}).get("items") or []:
                 cr = c.get("creator") or {}
-                print(json.dumps({"guid": g, "comment_id": c.get("id"), "created_at": c.get("created_at"),
-                                  "creator_type": cr.get("type"), "creator_id": cr.get("id"),
-                                  "content": c.get("content")}, ensure_ascii=False))
+                rows.append({"guid": g, "comment_id": c.get("id"), "created_at": c.get("created_at"),
+                             "creator_type": cr.get("type"), "creator_id": cr.get("id"), "content": c.get("content")})
+            return rows
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for rows in ex.map(one_comments, a[1:]):
+                for row in rows:
+                    print(json.dumps(row, ensure_ascii=False))
         return
     if a[0] == "task-get" and len(a) >= 2:
-        for g in a[1:]:
+        from concurrent.futures import ThreadPoolExecutor
+
+        def one_get(g):
             r = call("GET", "/open-apis/task/v2/tasks/%s?user_id_type=open_id" % g, token=t)
             if r.get("code") != 0:
-                print(json.dumps({"guid": g, "error": "code=%s msg=%s" % (r.get("code"), r.get("msg"))}, ensure_ascii=False))
-                continue
+                return {"guid": g, "error": "code=%s msg=%s" % (r.get("code"), r.get("msg"))}
             tk = r["data"]["task"]
             done = tk.get("completed_at") not in (None, "", "0", 0)
-            print(json.dumps({"guid": g, "summary": tk.get("summary"), "completed": done,
-                              "completed_at": tk.get("completed_at")}, ensure_ascii=False))
+            return {"guid": g, "summary": tk.get("summary"), "completed": done, "completed_at": tk.get("completed_at")}
+        with ThreadPoolExecutor(max_workers=8) as ex:  # 並行讀取，保持輸出順序與輸入一致
+            for row in ex.map(one_get, a[1:]):
+                print(json.dumps(row, ensure_ascii=False))
         return
     if a[0] == "send" and len(a) >= 2:
         r = call("POST", "/open-apis/im/v1/messages?receive_id_type=chat_id",
