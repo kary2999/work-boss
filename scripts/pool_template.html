@@ -46,6 +46,14 @@ input[type=search]{border:1px solid var(--line);background:var(--card);border-ra
 .pick{margin-left:auto}
 .pick input{width:17px;height:17px}
 .openq{background:var(--warn);border:1px solid var(--warnline);border-radius:6px;padding:2px 8px;font-size:12px}
+.lanes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.lane{background:color-mix(in srgb,var(--card) 60%,var(--bg));border:1px solid var(--line);border-radius:12px;padding:10px}
+.lane>.lh{font-weight:600;font-size:15px;padding:2px 4px 8px;border-bottom:3px solid var(--sidec);margin-bottom:8px}
+.lane .lh small{display:block;color:var(--sub);font-weight:400;font-size:12px}
+.wave{font-size:12px;color:var(--sub);margin:12px 4px 6px}
+.lane .card{margin-bottom:8px}
+.strip{margin-top:20px}
+@media (max-width:900px){.lanes{grid-template-columns:1fr}}
 .empty{padding:40px;text-align:center;color:var(--sub)}
 #drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,100%);background:var(--card);border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.15);transform:translateX(105%);transition:transform .18s;z-index:20;overflow:auto;padding:18px 20px 40px}
 #drawer.on{transform:none}
@@ -125,7 +133,7 @@ function renderFilters(){
   fill('fPri',['P0','P1','P2'],F.pri,function(k){return k});
   fill('fSt',['pool','doing','done','out'],F.st,function(k){return STL[k]});
   var g=document.getElementById('fGroup');g.innerHTML='';
-  [['flat','平铺'],['module','按模块'],['side','按端'],['pri','按优先级']].forEach(function(p){
+  [['flat','平铺'],['lane','按方向分配'],['module','按模块'],['side','按端'],['pri','按优先级']].forEach(function(p){
     g.appendChild(chip(p[1],F.group===p[0],function(){F.group=p[0];update()}))});
 }
 function anyOn(o){return Object.keys(o).some(function(k){return o[k]})}
@@ -145,12 +153,27 @@ function cardHtml(i){
   return '<div class="card'+(SEL[i.id]?' sel':'')+(st(i)==='out'?' out':'')+'" tabindex="0" role="button" data-id="'+esc(i.id)+'" style="--sidec:'+SIDEC[i.side]+'" aria-label="'+esc(i.id+' '+i.title)+'">'+
    '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span>'+
    '<span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+(i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">'+esc(i.size)+'</span>':'')+
-   (st(i)!=='pool'?'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>':'')+
+   (i.side!=='PM'?'<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>':'')+(i.owner?'<span class="tag" style="color:var(--accent)">'+esc(i.owner)+'</span>':'')+(st(i)!=='pool'?'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>':'')+
    '<label class="pick"><span class="sr">选择 '+esc(i.id)+'</span><input type="checkbox" data-pick="'+esc(i.id)+'"'+(SEL[i.id]?' checked':'')+'></label></div>'+
    '<div class="t">'+esc(i.title)+'</div><div class="what">'+esc(i.what)+'</div>'+
    '<div class="meta"><span>'+esc(i.module)+'</span>'+(i.prd?'<span>PRD '+esc(i.prd)+'</span>':'')+((i.deps||[]).length?'<span>依赖 '+i.deps.length+'</span>':'')+
    (open?'<span class="openq">待确认 '+open+'</span>':'')+'</div></div>';
 }
+var WAVE={};
+(function(){function w(id,seen){if(WAVE[id]!=null)return WAVE[id];if(seen[id])return 1;seen[id]=1;
+  var m=0;((byId[id]||{}).deps||[]).forEach(function(d){if(byId[d]&&byId[d].side!=='PM')m=Math.max(m,w(d,seen))});WAVE[id]=m+1;return WAVE[id]}
+  items.forEach(function(i){w(i.id,{})})})();
+var DAYS={S:1,M:2.5,L:4};
+function renderLanes(list){
+  var dirs=['FE','BE','QA'], by={};
+  dirs.forEach(function(d){by[d]=list.filter(function(i){return i.side===d&&st(i)!=='out'}).sort(function(a,b){return WAVE[a.id]-WAVE[b.id]||(a.id<b.id?-1:1)})});
+  var rest=list.filter(function(i){return i.side==='PM'||st(i)==='out'});
+  var h='<div class="lanes">'+dirs.map(function(d){
+    var l=by[d], days=l.reduce(function(a,i){return a+(DAYS[i.size]||0)},0), last=0, body='';
+    l.forEach(function(i){ if(WAVE[i.id]!==last){last=WAVE[i.id];body+='<div class="wave">批次 '+last+(last===1?'（可先开工）':'（依赖前面批次）')+'</div>'} body+=cardHtml(i)});
+    return '<div class="lane" style="--sidec:'+SIDEC[d]+'"><div class="lh">'+esc(SIDE[d])+' · '+l.length+' 条<small>初估约 '+days+' 人天（S=1、M=2.5、L=4 的粗算，待研发评估）</small></div>'+(body||'<div class="empty">无</div>')+'</div>'}).join('')+'</div>';
+  if(rest.length)h+='<div class="strip"><div class="group">待决策 / 本期不做<small>'+rest.length+' 条，不分配给研发；待决策项会阻塞相关需求</small></div><div class="grid">'+rest.map(cardHtml).join('')+'</div></div>';
+  return h}
 function groupsOf(list){
   if(F.group==='flat')return [{name:'',list:list}];
   var key=F.group==='module'?function(i){return i.module}:F.group==='side'?function(i){return SIDE[i.side]}:function(i){return i.pri};
@@ -163,6 +186,7 @@ function render(){
   var list=filtered(), b=document.getElementById('board');
   document.getElementById('count').textContent='显示 '+list.length+' / '+items.length+' 条';
   if(!list.length){b.innerHTML='<div class="empty">没有符合条件的需求</div>';return}
+  if(F.group==='lane'){b.innerHTML=renderLanes(list);return}
   b.innerHTML=groupsOf(list).map(function(g){
     return (g.name?'<div class="group">'+esc(g.name)+'<small>'+g.list.length+' 条</small></div>':'')+'<div class="grid">'+g.list.map(cardHtml).join('')+'</div>'}).join('');
 }
@@ -178,7 +202,7 @@ function depChip(id){var d=byId[id];return '<button class="chip dep" type="butto
 function detailHtml(i){
   var dependents=items.filter(function(x){return (x.deps||[]).indexOf(i.id)>=0});
   return '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span><span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+
-    (i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">初估 '+esc(i.size)+'</span>':'')+'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span></div>'+
+    (i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">初估 '+esc(i.size)+'</span>':'')+'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>'+(i.side!=='PM'?'<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>':'')+(i.owner?'<span class="tag" style="color:var(--accent)">负责：'+esc(i.owner)+'</span>':'')+'</div>'+
     '<h2>'+esc(i.title)+'</h2><div class="sub">'+esc(i.module)+(i.prd?' · PRD '+esc(i.prd):'')+'</div>'+
     '<h3>需求说明</h3><div class="what" style="display:block;color:var(--ink)">'+esc(i.what)+'</div>'+
     ((i.accept||[]).length?'<h3>验收标准</h3><ul>'+i.accept.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul>':'')+
