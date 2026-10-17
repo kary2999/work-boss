@@ -871,6 +871,22 @@ def refresh_dashboard(dry):
         pass  # 看板刷新失败不能拖垮监工
 
 
+def refresh_wiki(dry):
+    """配置了 wiki 才同步到 Lark 知识库页面；失败只提示，不影响主流程。"""
+    if dry or not DASHBOARD:
+        return
+    cfg = load_json(os.path.join(ROOT, "config", "lark.json"), {}) or {}
+    if not cfg.get("wiki"):
+        return
+    try:
+        r = subprocess.run([sys.executable, "-X", "utf8", "-I", os.path.join(ROOT, "scripts", "wiki_sync.py")],
+                           capture_output=True, text=True, timeout=240, cwd=ROOT)
+        if r.returncode != 0:
+            print("知识库同步失败：" + (r.stderr or r.stdout).strip()[:300], file=sys.stderr)
+    except Exception as e:
+        print("知识库同步异常：%s" % str(e)[:200], file=sys.stderr)
+
+
 def post_run(day, client, dry, res, phase):
     """每个命令收尾：进度写回本地 → 任务卡同步 → 读补充需求 → 维护次日计划 → 需求不足就要 → 刷新看板。"""
     state = load_json(p_state_tasks(day), [])
@@ -891,6 +907,8 @@ def post_run(day, client, dry, res, phase):
             plan = refresh_plan(nxt, res or [], client, dry, final=False)
         maybe_ask(client, plan, nxt, dry, final=(phase == "close"))
     refresh_dashboard(dry)
+    if phase in ("morning", "evening", "sync", "close"):  # chase 每 30 分钟一次，不同步知识库
+        refresh_wiki(dry)
 
 
 def carry_and_plan(day, client, dry, write_plan=True):

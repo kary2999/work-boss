@@ -7,5 +7,10 @@
   "app_secret_key": "FEISHU_APP_SECRET",
   "domain_key": "FEISHU_DOMAIN",
   "min_plan_hours": 4,
+  "wiki": {
+    "space_id": "7xxxxxxxxxxxxxxxxxx",
+    "parent_node_token": "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "title": "工作日志看板"
+  },
   "note": "只存非敏感标识。密钥运行时从 env_file 读取，不得复制进本仓库。domain 值含 lark 走 open.larksuite.com，否则走 open.feishu.cn"
 }

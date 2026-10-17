@@ -40,7 +40,9 @@ def tasks():
         done = len(re.findall(r"^\s*- \[[xX]\]", body, re.M))
         out.append({"file": n, "id": meta.get("id", n), "title": meta.get("title", n),
                     "status": meta.get("status", "todo") or "todo", "owner": meta.get("owner", ""),
-                    "progress": meta.get("progress", ""),
+                    "progress": meta.get("progress", ""), "est_hours": meta.get("est_hours", ""),
+                    "phase": meta.get("phase", ""), "page": meta.get("page", ""),
+                    "images": len([x for x in meta.get("images", "").split("|") if x.strip()]),
                     "due": meta.get("due", ""), "created": meta.get("created", ""),
                     "blocked_by": meta.get("blocked_by", ""), "done": done, "total": total, "body": body})
     return out

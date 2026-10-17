@@ -102,6 +102,7 @@ due: 2026-10-16
 | `progress.json` | **进度快照**：`{days:{日期:{main_done,main_total,sub_done,sub_total,items[],reminders,replied,absent,updated}}}`。每个命令结束时刷新；缺失的历史日会自动回填。看板与任务卡同步都读它 |
 | `asks.json` | “需求不足”主动询问记录：`{目标日:{mids[],count,last}}` |
 | `needs.json` | 用户回复补充的需求：`{items:[{id,title,est_hours,target,mid}], ingested:[已读消息id]}` |
+| `wiki.json` | Lark 知识库页面标识：`{node_token, obj_token, space_id}`，首次同步时创建（见 docs/setup-macos.md 第 8 节） |
 | `logs/` | launchd 的 stdout／stderr |
 
 ## 5. 判定规则（chase／close 共用）
