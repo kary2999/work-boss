@@ -8,7 +8,7 @@
   python3 scripts/wiki_sync.py --out 看板.md  写成本地 Markdown 文件，可在 Lark 里“导入”手动使用（没有写权限时的备用办法）
 
 配置（config/lark.json，私有）：
-  "wiki": {"space_id": "…", "parent_node_token": "…", "title": "工作日志看板"}
+  "wiki": {"space_id": "…", "parent_node_token": "留空＝知识库根目录"}
 页面标识保存在 .supervisor/wiki.json。机器人需要对父页面有「可编辑」权限，见 docs/setup-macos.md。
 页面内容由本脚本整页重写，不要在页面里手改；父页面原有的正文与子页面不会被动。
 """
@@ -51,7 +51,7 @@ def collect(root=ROOT):
         t["images"] = [x.strip() for x in meta.get("images", "").split("|") if x.strip()]
     return {"today": dt.date.today().isoformat(), "tasks": tasks, "logs": bd.worklogs(), "plans": bd.plans(),
             "min_hours": bd.min_hours(), "progress": _load(os.path.join(sup, "progress.json"), {"days": {}}).get("days", {}),
-            "asks": asks}
+            "asks": asks, "needs": _load(os.path.join(sup, "needs.json"), {"items": []}).get("items", [])}
 
 
 # ---------- Markdown 渲染（纯函数，有单元测试） ----------
@@ -112,8 +112,8 @@ def _plans(data):
     return "\n".join(pl)
 
 
-def _progress(data):
-    days = sorted(data["progress"], reverse=True)[:7]
+def _progress(data, days=7):
+    days = sorted(data["progress"], reverse=True)[:days]
     if not days:
         return None
     pr = ["## 每日进度（最近 %d 天）" % len(days), ""]
@@ -183,15 +183,74 @@ def card_page(t, now):
         merge_chunks([demote(body, by=1)]) + (["## 参考图\n\n共 %d 张，见下方。" % len(t["images"])] if t.get("images") else [])
 
 
+def _plan_table(p):
+    if not p["items"]:
+        return "（没有项目）"
+    return table(["时段", "任务", "估时", "子任务", "备注"], [
+        [i["slot"], ("[%s] " % i["ref"] if i["ref"] else "") + i["title"], "%gh" % float(i["est_hours"]), i["subs"],
+         ("顺延" + ("：" + i["reason"] if i["reason"] else "") if i["carried"] else "") + ("；你补充的需求" if i["req"] else "")]
+        for i in p["items"]]) + "\n\n合计 %gh ｜ 来源：%s%s" % (p["total_hours"], p["generated_by"], (" ｜ 未排入：" + "、".join(p["deferred"])) if p["deferred"] else "")
+
+
+def _chip(p, min_hours):
+    return ("草案" if p["draft"] else "已定稿") + ("，**需求不足**" if p["total_hours"] < min_hours else "")
+
+
+def overview_page(data, now):
+    """对应本地看板的“概览”页签：指标、提醒、今日／明日计划、任务卡、最近日志、旷工。"""
+    today, tmr = data["today"], next_day(data["today"])
+    pg = data["progress"].get(today)
+    cp = next((p for p in data["plans"] if p["date"] == today), None)
+    tp = next((p for p in data["plans"] if p["date"] == tmr), None)
+    absent = [l for l in data["logs"] if l.get("absent")]
+    today_logs = len([l for l in data["logs"] if l["date"] == today])
+    out = ["> 本页由“监工”自动生成，请勿手改。最近更新：%s" % now.strftime("%Y-%m-%d %H:%M"),
+           table(["今日主任务（Lark 勾选）", "明日计划工时（下限 %gh）" % data["min_hours"], "今日日志", "旷工记录"],
+                 [["%d / %d" % (pg["main_done"], pg["main_total"]) if pg else "—", "%gh" % tp["total_hours"] if tp else "—", today_logs, len(absent)]])]
+    if tp is None:
+        out.append("**明日（%s）还没有计划文件。**" % tmr)
+    elif tp["total_hours"] < data["min_hours"]:
+        out.append("**明日需求不足**：已排 %d 项、约 %gh，低于下限 %gh。请在 Lark 回复需求。" % (len(tp["items"]), tp["total_hours"], data["min_hours"]))
+    if data.get("needs"):
+        out.append("**你补充的需求**（已并入计划）：" + "、".join("%s（%sh → %s）" % (n["title"], n["est_hours"], n["target"]) for n in data["needs"]))
+    cnt = {}
+    for t in data["tasks"]:
+        cnt[t["status"]] = cnt.get(t["status"], 0) + 1
+    out.append("**任务卡**：" + "　".join("%s %d" % (STATUS[k], cnt[k]) for k in STATUS if k in cnt))
+    if cp:
+        out.append("## 今日计划（%s）\n\n%s" % (_chip(cp, data["min_hours"]), _plan_table(cp)))
+    if tp:
+        out.append("## 明日计划（%s）\n\n%s" % (_chip(tp, data["min_hours"]), _plan_table(tp)))
+    out.append("## 任务卡\n\n" + (table(["编号", "标题", "状态", "Lark 进度", "截止", "验收项"], [
+        [t["id"], t["title"], STATUS.get(t["status"], t["status"]), t["progress"] or "", t["due"] or "", "%d / %d" % (t["done"], t["total"])]
+        for t in data["tasks"] if t["status"] != "cancelled"]) if data["tasks"] else "还没有任务卡"))
+    recent = data["logs"][:5]
+    out.append("## 最近日志\n\n" + ("\n".join("- %s %s · %s · %s" % (l["date"], l["time"], l["agent"], l["task"]) for l in recent) if recent else "还没有日志"))
+    if absent:
+        out.append("## 旷工记录\n\n" + "\n".join("- %s %s" % (l["date"], l["task"]) for l in absent))
+    return merge_chunks(out)
+
+
 def build_pages(data, now=None):
-    """返回有序页面列表：[{key, parent, title, chunks, images}]。父页面一定排在子页面之前。"""
+    """页面结构与本地 docs/dashboard.html 的五个页签一致：概览／进度／计划／任务卡／日志。
+    返回有序页面列表 [{key, parent, title, chunks, images}]，父页面一定排在子页面之前。"""
     now = now or dt.datetime.now()
     pages = []
-    hub = [_overview(data, now), "## 目录\n\n- 工作日志看板：计划与每日进度\n- 任务卡：按阶段的总表，每张卡有自己的详情页（含参考图）\n- 工作日志：监工与 agent 的日志，每篇一页"]
-    pages.append({"key": "hub", "parent": None, "title": HUB_TITLE, "chunks": hub, "images": []})
-    board = [_plans(data)] + ([_progress(data)] if _progress(data) else [])
-    pages.append({"key": "board", "parent": "hub", "title": "工作日志看板", "chunks": merge_chunks(board), "images": []})
-    pages.append({"key": "cards", "parent": "hub", "title": "任务卡", "chunks": merge_chunks(_cards(data, with_head=False)), "images": []})
+    pages.append({"key": "hub", "parent": None, "title": HUB_TITLE, "images": [], "chunks": [
+        "> 本页由“监工”自动生成，请勿手改。最近更新：%s\n\n与本地 docs/dashboard.html 同样的五个页签，对应下面五个子页面：\n\n- 概览：指标、提醒、今日与明日计划、任务卡、最近日志、旷工\n- 进度：每天的任务完成情况与你写的原因\n- 计划：全部日期的时段计划\n- 任务卡：按状态分组，每张卡一页（含参考图）\n- 工作日志：每篇日志一页" % now.strftime("%Y-%m-%d %H:%M")]})
+    pages.append({"key": "overview", "parent": "hub", "title": "概览", "chunks": overview_page(data, now), "images": []})
+    days = sorted(data["progress"], reverse=True)
+    pages.append({"key": "progress", "parent": "hub", "title": "进度", "images": [],
+                  "chunks": merge_chunks([_progress(data, days=len(days))]) if days else ["还没有进度同步。"]})
+    pg = [p for p in data["plans"]]
+    pages.append({"key": "plans", "parent": "hub", "title": "计划", "images": [], "chunks": merge_chunks(
+        ["### %s%s（%s）\n\n%s" % (p["date"], "（今日）" if p["date"] == data["today"] else "", _chip(p, data["min_hours"]), _plan_table(p)) for p in pg]) or ["还没有计划。"]})
+    by = {}
+    for t in data["tasks"]:
+        by.setdefault(t["status"], []).append(t)
+    groups = ["### %s（%d）\n\n%s" % (STATUS[k], len(by[k]), table(["编号", "页面", "标题", "Lark 进度", "估时"], [
+        [t["id"], t["page"], t["title"], t["progress"] or "", t["est_hours"] and "%sh" % t["est_hours"] or ""] for t in by[k]])) for k in STATUS if k in by and k != "cancelled"]
+    pages.append({"key": "cards", "parent": "hub", "title": "任务卡", "chunks": merge_chunks(groups) or ["还没有任务卡。"], "images": []})
     for t in data["tasks"]:
         if t["status"] == "cancelled":
             continue
@@ -199,8 +258,8 @@ def build_pages(data, now=None):
                       "chunks": card_page(t, now), "images": list(t.get("images") or [])})
     logs = data["logs"][:MAX_LOG_PAGES]
     idx = table(["时间", "来源", "类型", "旷工"], [["%s %s" % (l["date"], l["time"]), l["agent"], l["task"], "是" if l.get("absent") else ""] for l in logs])
-    pages.append({"key": "logs", "parent": "hub", "title": "工作日志",
-                  "chunks": ["> 最近 %d 篇，新的在前；每篇日志是本页的一个子页面。\n\n%s" % (len(logs), idx)], "images": []})
+    pages.append({"key": "logs", "parent": "hub", "title": "工作日志", "images": [],
+                  "chunks": ["> 最近 %d 篇，新的在前；每篇日志是本页的一个子页面。\n\n%s" % (len(logs), idx)]})
     for l in logs:
         pages.append({"key": "log:" + l["file"], "parent": "logs", "title": "%s %s · %s · %s" % (l["date"], l["time"], l["agent"], l["task"]),
                       "chunks": merge_chunks([demote(_log_body(l, LOG_PAGE_CHARS), by=1)]) or ["（空）"], "images": []})
@@ -260,6 +319,9 @@ def _state_path():
 def load_state(space_id):
     """.supervisor/wiki.json：{"space_id", "pages": {key: {"node","obj","hash"}}}。兼容只有单页的旧格式。"""
     st = _load(_state_path(), {})
+    if "pages" in st and "board" in st["pages"]:       # 旧版“看板”页并入新的“计划”页
+        st["pages"]["plans"] = st["pages"].pop("board")
+        st["pages"]["plans"]["hash"] = ""
     if "pages" not in st:
         pages = {}
         if st.get("obj_token"):
@@ -281,8 +343,10 @@ def ensure_node(L, token, st, spec, parent_node):
     rec = st["pages"].get(spec["key"])
     if rec and rec.get("obj"):
         return rec
-    d = _check(L.call("POST", "/open-apis/wiki/v2/spaces/%s/nodes" % st["space_id"],
-                      {"obj_type": "docx", "parent_node_token": parent_node, "node_type": "origin", "title": spec["title"]}, token),
+    body = {"obj_type": "docx", "node_type": "origin", "title": spec["title"]}
+    if parent_node:                       # 没有父节点就建在知识库根目录
+        body["parent_node_token"] = parent_node
+    d = _check(L.call("POST", "/open-apis/wiki/v2/spaces/%s/nodes" % st["space_id"], body, token),
                "新建知识库页面「%s」" % spec["title"])
     n = d["node"]
     rec = {"node": n["node_token"], "obj": n["obj_token"], "hash": "", "title": spec["title"]}
@@ -403,17 +467,13 @@ def publish_pages(pages, cfg, only_changed=True, log=print, workers=6):
     token = L.token()
     w = cfg["wiki"]
     st = load_state(w["space_id"])
-    root_parent = w["parent_node_token"]
+    root_parent = w.get("parent_node_token") or None   # 留空＝知识库根目录
     lock = threading.Lock()
     todo, skipped = [], 0
     for spec in pages:
         parent = root_parent if not spec["parent"] else st["pages"][spec["parent"]]["node"]
         existed = spec["key"] in st["pages"]
         rec = ensure_node(L, token, st, spec, parent)
-        if existed and spec["key"] == "board" and not rec.get("parent_ok"):
-            move_node(L, token, st, rec, st["pages"]["hub"]["node"])  # 旧版建在父页面下，收进“工作计划”
-            rec["parent_ok"] = True
-            save_state(st)
         if existed and rec.get("title") != spec["title"]:
             rename_node(L, token, st, rec, spec["title"])
         h = page_hash(spec)

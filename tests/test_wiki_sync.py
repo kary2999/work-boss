@@ -97,6 +97,9 @@ class CleanBlocksTests(unittest.TestCase):
 class PagesTests(unittest.TestCase):
     def setUp(self):
         d = sample()
+        d["needs"] = []
+        for x in d["tasks"]:
+            x.update({"due": "", "owner": "", "done": 0, "total": 0})
         d["tasks"][0].update({"images": ["参考图组/a.jpg", "参考图组/b.jpg"], "body": "## 目标\n画图\n\n![x](a.jpg)\n- [ ] 验收", "blocked_by": "", "done": 0, "total": 1})
         d["tasks"][1].update({"images": [], "body": "正文", "blocked_by": "[S01]", "done": 0, "total": 0})
         d["tasks"][2].update({"images": [], "body": "旧", "blocked_by": "", "done": 0, "total": 0})
