@@ -1,0 +1,23 @@
+{
+  "name": "项目名 需求池",
+  "version": "V0.1",
+  "note": "一句话说明来源与工时口径。",
+  "sources": {"PRD": "https://example.com/prd", "UI": "https://example.com/ui"},
+  "items": [
+    {
+      "id": "R01",
+      "title": "需求标题",
+      "side": "BE",
+      "module": "模块名",
+      "pri": "P0",
+      "size": "M",
+      "what": "这条需求要做什么。",
+      "accept": ["验收标准一", "验收标准二"],
+      "deps": [],
+      "prd": "6.1",
+      "ui": ["对应的 UI 画板标题"],
+      "open": ["待确认的问题"],
+      "status": "pool"
+    }
+  ]
+}

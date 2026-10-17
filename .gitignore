@@ -9,9 +9,12 @@ plans/*
 !plans/_TEMPLATE.json
 PROJECT.md
 notes/
+requirements/*
+!requirements/_TEMPLATE.json
 
 # ---- 示范项目的产出（不是监工系统本身）----
 docs/dashboard.html
+docs/pool.html
 docs/axure-master-library-plan.html
 docs/three-day-plan.html
 docs/master-spec.html

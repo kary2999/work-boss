@@ -148,3 +148,30 @@ due: 2026-10-16
 - `close`：已存在当日 `rollover` 日志则跳过。
 - 次日计划文件：`generated_by=supervisor` 的可被重新生成；人／agent 写的**不覆盖**。
 - `evening` 与 `chase` **不是**幂等：重复运行会重复发卡片，所以同一时间只能启用一种定时方式（launchd 或过渡的 Claude 定时任务）。
+
+## 需求池 `requirements/pool.json`
+
+把 PRD／设计稿拆成可分配给前端、后端、测试的需求，并生成平铺页面 `docs/pool.html` 供人工查看与演示。**需求池和生成的页面都是私有文件，不入库**（模板 `requirements/_TEMPLATE.json` 入库）。
+
+```bash
+python3 scripts/build_pool.py        # 校验 + 生成 docs/pool.html；校验不过会列出问题并退出码 1
+```
+
+顶层：`name`、`version`、`note`、`sources`（`PRD`、`UI` 链接，可选）、`items`。每条需求：
+
+| 字段 | 含义 |
+|---|---|
+| `id` | 唯一编号，如 `R01` |
+| `title` / `what` | 标题／说明 |
+| `side` | `FE` 前端、`BE` 后端、`QA` 测试、`PM` 产品或待决策 |
+| `module` | 所属模块，页面上用来筛选与分组 |
+| `pri` | `P0`／`P1`／`P2`，不做的写 `—` |
+| `size` | 初估规模 `S`／`M`／`L`（只是估计，需研发评估） |
+| `accept` | 验收标准列表 |
+| `deps` | 前置需求的 `id` 列表；必须存在且不能成环 |
+| `prd` / `ui` | PRD 章节、对应设计稿画板标题 |
+| `open` | 待确认的问题，卡片上会高亮 |
+| `status` | `pool`（默认）／`doing`／`done`／`out`（本期不做） |
+
+页面功能：平铺卡片、按端／模块／优先级／范围筛选、搜索、按模块／端／优先级分组、点卡片看详情（含依赖跳转）、勾选后复制清单、演示模式（快捷键 P，←／→ 翻页，Esc 退出）。勾选状态只存在浏览器本地。
+

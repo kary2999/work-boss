@@ -451,7 +451,7 @@ class FlowTests(unittest.TestCase):
     def test_morning_with_nothing_to_do_says_so_and_asks(self):
         os.environ["WORK_BOSS_MIN_HOURS"] = "4"
         c = FakeClient()
-        sv.cmd_morning("2026-10-17", c, dry=False)
+        sv.cmd_morning(dt.date.today().isoformat(), c, dry=False)  # 是否算“今日”取决于真实日期，不能写死
         self.assertEqual(c.created, [])
         titles = [x[0] for x in c.cards]
         self.assertIn("今日无工作计划", titles)

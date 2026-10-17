@@ -8,7 +8,7 @@ FILES="$( (git ls-files; git diff --cached --name-only) | sort -u)"
 BAD=0
 
 echo "== 1. 禁止入库的路径 =="
-echo "$FILES" | grep -E '^(worklog/[^_]|\.supervisor/|config/lark\.json$|tasks/T[0-9]|plans/[0-9]|PROJECT\.md$|notes/)' && BAD=1 || echo "OK"
+echo "$FILES" | grep -E '^(worklog/[^_]|\.supervisor/|config/lark\.json$|tasks/T[0-9]|plans/[0-9]|PROJECT\.md$|notes/|requirements/[^_]|docs/pool\.html$)' && BAD=1 || echo "OK"
 
 echo "== 2. 真实标识与疑似密钥 =="
 # oc_/ou_/cli_ 后接 16 位以上英数＝真实 Lark 标识；示例文件里用 x 占位不会命中

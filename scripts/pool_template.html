@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>需求池</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2127;--sub:#5b6673;--line:#dde1e6;--accent:#1f6feb;--sel:#e8f0fe;
+--fe:#1f6feb;--be:#1a7f4b;--qa:#7a3fc4;--pm:#a15c00;--p0:#c62828;--p1:#b45309;--p2:#5b6673;--warn:#fff4e5;--warnline:#e0a15a}
+@media (prefers-color-scheme:dark){:root{--bg:#14171b;--card:#1d2127;--ink:#e6e9ed;--sub:#9aa6b2;--line:#2e343c;--accent:#6ea8ff;--sel:#1f2d45;
+--fe:#6ea8ff;--be:#5fd08f;--qa:#b794f4;--pm:#f0b25a;--p0:#ff8a80;--p1:#f0b25a;--p2:#9aa6b2;--warn:#3a2e1c;--warnline:#8a6a2f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{padding:20px 24px 8px;max-width:1500px;margin:0 auto}
+h1{margin:0 0 4px;font-size:22px}
+.sub{color:var(--sub);font-size:13px}
+.sub a{color:var(--accent)}
+.wrap{max-width:1500px;margin:0 auto;padding:0 24px 90px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:96px}
+.stat b{font-size:20px;display:block}
+.stat span{color:var(--sub);font-size:12px}
+.bar{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.row .lbl{color:var(--sub);font-size:12px;min-width:34px}
+button,input{font:inherit;color:inherit}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 12px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip:focus-visible,.card:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=search]{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 10px;min-width:240px}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 12px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.group{margin:22px 0 8px;font-size:15px;font-weight:600}
+.group small{color:var(--sub);font-weight:400;margin-left:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;position:relative;border-left:5px solid var(--sidec,var(--line))}
+.card:hover{border-color:var(--accent)}
+.card.sel{background:var(--sel);border-color:var(--accent)}
+.card.out{opacity:.6;border-style:dashed}
+.top{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.id{font-family:ui-monospace,Menlo,monospace;color:var(--sub);font-size:12px}
+.tag{font-size:11px;border:1px solid currentColor;border-radius:4px;padding:0 5px;white-space:nowrap}
+.t{font-weight:600;font-size:15px}
+.what{color:var(--sub);font-size:13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.meta{color:var(--sub);font-size:12px;display:flex;gap:10px;flex-wrap:wrap}
+.pick{margin-left:auto}
+.pick input{width:17px;height:17px}
+.openq{background:var(--warn);border:1px solid var(--warnline);border-radius:6px;padding:2px 8px;font-size:12px}
+.empty{padding:40px;text-align:center;color:var(--sub)}
+#drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,100%);background:var(--card);border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.15);transform:translateX(105%);transition:transform .18s;z-index:20;overflow:auto;padding:18px 20px 40px}
+#drawer.on{transform:none}
+#drawer h2{margin:6px 0 8px;font-size:19px}
+#drawer h3{margin:16px 0 6px;font-size:13px;color:var(--sub);text-transform:none}
+#drawer ul{margin:0;padding-left:20px}
+.dep{display:inline-block;margin:0 6px 6px 0}
+#sel{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 24px;display:none;gap:10px;align-items:center;z-index:10}
+#sel.on{display:flex}
+#pres{position:fixed;inset:0;background:var(--bg);z-index:30;display:none;overflow:auto;padding:5vh 6vw}
+#pres.on{display:block}
+#pres .big{max-width:980px;margin:0 auto}
+#pres h2{font-size:clamp(24px,4vw,40px);margin:10px 0}
+#pres .what{display:block;-webkit-line-clamp:unset;font-size:clamp(15px,2vw,20px);color:var(--ink)}
+#pres li{font-size:clamp(14px,1.8vw,18px)}
+#pres .nav{position:fixed;left:0;right:0;bottom:0;padding:12px 24px;display:flex;gap:10px;justify-content:center;align-items:center;background:var(--bg);border-top:1px solid var(--line)}
+.sr{position:absolute;left:-9999px}
+@media (max-width:600px){header,.wrap{padding-left:14px;padding-right:14px}input[type=search]{min-width:0;width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="ttl">需求池</h1>
+  <div class="sub" id="note"></div>
+</header>
+<div class="wrap">
+  <div class="stats" id="stats"></div>
+  <div class="bar">
+    <div class="row"><span class="lbl">端</span><span id="fSide"></span></div>
+    <div class="row"><span class="lbl">模块</span><span id="fMod"></span></div>
+    <div class="row"><span class="lbl">优先级</span><span id="fPri"></span><span class="lbl" style="margin-left:14px">范围</span><span id="fSt"></span></div>
+    <div class="row">
+      <input type="search" id="q" placeholder="搜索编号、标题、内容、验收项…" aria-label="搜索需求">
+      <span class="lbl">分组</span><span id="fGroup"></span>
+      <button class="btn" id="reset">清除筛选</button>
+      <button class="btn primary" id="presBtn" title="快捷键 P">演示模式</button>
+      <span class="sub" id="count"></span>
+    </div>
+  </div>
+  <div id="board"></div>
+</div>
+
+<aside id="drawer" aria-label="需求详情" aria-hidden="true"></aside>
+
+<div id="sel"><b id="selN"></b><span class="sub" id="selList"></span>
+  <button class="btn primary" id="copy">复制所选</button><button class="btn" id="clr">清除所选</button><span class="sub" id="copied"></span></div>
+
+<div id="pres" aria-hidden="true"><div class="big" id="presBody"></div>
+  <div class="nav"><button class="btn" id="prev">← 上一条</button><span class="sub" id="presPos"></span><button class="btn" id="next">下一条 →</button><button class="btn" id="exit">退出（Esc）</button></div></div>
+
+<script>
+var POOL = /*__POOL__*/null;
+var SIDE={FE:'前端',BE:'后端',QA:'测试',PM:'产品/待决策'}, SIDEC={FE:'var(--fe)',BE:'var(--be)',QA:'var(--qa)',PM:'var(--pm)'};
+var PRIC={'P0':'var(--p0)','P1':'var(--p1)','P2':'var(--p2)','—':'var(--p2)'};
+var STL={pool:'需求池',doing:'进行中',done:'已完成',out:'本期不做'};
+var items=POOL.items, byId={}; items.forEach(function(i){byId[i.id]=i});
+var F={side:{},mod:{},pri:{},st:{pool:1,doing:1,done:1},group:'flat',q:''};
+var SELK='pool-selected', SEL={}; try{SEL=JSON.parse(localStorage.getItem(SELK)||'{}')}catch(e){SEL={}}
+function saveSel(){try{localStorage.setItem(SELK,JSON.stringify(SEL))}catch(e){}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function uniq(a){return a.filter(function(x,i){return a.indexOf(x)===i})}
+function st(i){return i.status||'pool'}
+
+document.getElementById('ttl').textContent=POOL.name||'需求池';
+document.title=POOL.name||'需求池';
+var src=POOL.sources||{};
+document.getElementById('note').innerHTML=esc((POOL.version||'')+' · '+(POOL.note||''))+
+  (src.PRD?' · <a href="'+esc(src.PRD)+'" target="_blank" rel="noopener">PRD</a>':'')+(src.UI?' · <a href="'+esc(src.UI)+'" target="_blank" rel="noopener">UI 稿</a>':'');
+
+function chip(label,on,fn){var b=document.createElement('button');b.className='chip';b.type='button';b.textContent=label;b.setAttribute('aria-pressed',on?'true':'false');b.onclick=fn;return b}
+function renderFilters(){
+  var mods=uniq(items.map(function(i){return i.module}));
+  function fill(id,keys,store,label){var el=document.getElementById(id);el.innerHTML='';
+    keys.forEach(function(k){el.appendChild(chip(label(k),!!store[k],function(){store[k]=!store[k];update()}))})}
+  fill('fSide',Object.keys(SIDE),F.side,function(k){return SIDE[k]});
+  fill('fMod',mods,F.mod,function(k){return k});
+  fill('fPri',['P0','P1','P2'],F.pri,function(k){return k});
+  fill('fSt',['pool','doing','done','out'],F.st,function(k){return STL[k]});
+  var g=document.getElementById('fGroup');g.innerHTML='';
+  [['flat','平铺'],['module','按模块'],['side','按端'],['pri','按优先级']].forEach(function(p){
+    g.appendChild(chip(p[1],F.group===p[0],function(){F.group=p[0];update()}))});
+}
+function anyOn(o){return Object.keys(o).some(function(k){return o[k]})}
+function text(i){return [i.id,i.title,i.what,i.module,(i.accept||[]).join(' '),(i.open||[]).join(' '),i.prd,(i.ui||[]).join(' ')].join(' ').toLowerCase()}
+function filtered(){
+  var q=F.q.trim().toLowerCase();
+  return items.filter(function(i){
+    if(anyOn(F.side)&&!F.side[i.side])return false;
+    if(anyOn(F.mod)&&!F.mod[i.module])return false;
+    if(anyOn(F.pri)&&!F.pri[i.pri])return false;
+    if(!F.st[st(i)])return false;
+    if(q&&text(i).indexOf(q)<0)return false;
+    return true});
+}
+function cardHtml(i){
+  var open=(i.open||[]).length;
+  return '<div class="card'+(SEL[i.id]?' sel':'')+(st(i)==='out'?' out':'')+'" tabindex="0" role="button" data-id="'+esc(i.id)+'" style="--sidec:'+SIDEC[i.side]+'" aria-label="'+esc(i.id+' '+i.title)+'">'+
+   '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span>'+
+   '<span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+(i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">'+esc(i.size)+'</span>':'')+
+   (st(i)!=='pool'?'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>':'')+
+   '<label class="pick"><span class="sr">选择 '+esc(i.id)+'</span><input type="checkbox" data-pick="'+esc(i.id)+'"'+(SEL[i.id]?' checked':'')+'></label></div>'+
+   '<div class="t">'+esc(i.title)+'</div><div class="what">'+esc(i.what)+'</div>'+
+   '<div class="meta"><span>'+esc(i.module)+'</span>'+(i.prd?'<span>PRD '+esc(i.prd)+'</span>':'')+((i.deps||[]).length?'<span>依赖 '+i.deps.length+'</span>':'')+
+   (open?'<span class="openq">待确认 '+open+'</span>':'')+'</div></div>';
+}
+function groupsOf(list){
+  if(F.group==='flat')return [{name:'',list:list}];
+  var key=F.group==='module'?function(i){return i.module}:F.group==='side'?function(i){return SIDE[i.side]}:function(i){return i.pri};
+  var order=uniq(list.map(key)), out=[];
+  if(F.group==='pri')order.sort();
+  order.forEach(function(k){out.push({name:k,list:list.filter(function(i){return key(i)===k})})});
+  return out;
+}
+function render(){
+  var list=filtered(), b=document.getElementById('board');
+  document.getElementById('count').textContent='显示 '+list.length+' / '+items.length+' 条';
+  if(!list.length){b.innerHTML='<div class="empty">没有符合条件的需求</div>';return}
+  b.innerHTML=groupsOf(list).map(function(g){
+    return (g.name?'<div class="group">'+esc(g.name)+'<small>'+g.list.length+' 条</small></div>':'')+'<div class="grid">'+g.list.map(cardHtml).join('')+'</div>'}).join('');
+}
+function stats(){
+  var act=items.filter(function(i){return st(i)!=='out'});
+  function n(f){return act.filter(f).length}
+  var h=[['需求总数',act.length],['前端',n(function(i){return i.side==='FE'})],['后端',n(function(i){return i.side==='BE'})],['测试',n(function(i){return i.side==='QA'})],
+    ['待决策',n(function(i){return i.side==='PM'})],['P0',n(function(i){return i.pri==='P0'})],['有待确认项',n(function(i){return (i.open||[]).length>0})],
+    ['本期不做',items.length-act.length]];
+  document.getElementById('stats').innerHTML=h.map(function(x){return '<div class="stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
+}
+function depChip(id){var d=byId[id];return '<button class="chip dep" type="button" data-go="'+esc(id)+'">'+esc(id+(d?' '+d.title:''))+'</button>'}
+function detailHtml(i){
+  var dependents=items.filter(function(x){return (x.deps||[]).indexOf(i.id)>=0});
+  return '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span><span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+
+    (i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">初估 '+esc(i.size)+'</span>':'')+'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span></div>'+
+    '<h2>'+esc(i.title)+'</h2><div class="sub">'+esc(i.module)+(i.prd?' · PRD '+esc(i.prd):'')+'</div>'+
+    '<h3>需求说明</h3><div class="what" style="display:block;color:var(--ink)">'+esc(i.what)+'</div>'+
+    ((i.accept||[]).length?'<h3>验收标准</h3><ul>'+i.accept.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul>':'')+
+    ((i.open||[]).length?'<h3>待确认</h3>'+i.open.map(function(o){return '<div class="openq" style="margin-bottom:6px">'+esc(o)+'</div>'}).join(''):'')+
+    ((i.ui||[]).length?'<h3>对应 UI 稿画板</h3><ul>'+i.ui.map(function(u){return '<li>'+esc(u)+'</li>'}).join('')+'</ul>'+(src.UI?'<div class="sub" style="margin-top:6px"><a href="'+esc(src.UI)+'" target="_blank" rel="noopener">打开 UI 稿</a></div>':''):'')+
+    ((i.deps||[]).length?'<h3>前置依赖</h3>'+i.deps.map(depChip).join(''):'')+
+    (dependents.length?'<h3>被这些需求依赖</h3>'+dependents.map(function(x){return depChip(x.id)}).join(''):'')+
+    '<div style="margin-top:20px"><button class="btn" id="dClose">关闭（Esc）</button></div>';
+}
+var openId=null;
+function openDrawer(id){var i=byId[id];if(!i)return;openId=id;var d=document.getElementById('drawer');d.innerHTML=detailHtml(i);d.classList.add('on');d.setAttribute('aria-hidden','false');d.scrollTop=0}
+function closeDrawer(){openId=null;var d=document.getElementById('drawer');d.classList.remove('on');d.setAttribute('aria-hidden','true')}
+function selUpdate(){
+  var ids=Object.keys(SEL).filter(function(k){return SEL[k]&&byId[k]});
+  var bar=document.getElementById('sel');bar.classList.toggle('on',ids.length>0);
+  document.getElementById('selN').textContent='已选 '+ids.length+' 条';
+  document.getElementById('selList').textContent=ids.slice(0,12).join('、')+(ids.length>12?' …':'');
+}
+function copyText(){
+  var ids=Object.keys(SEL).filter(function(k){return SEL[k]&&byId[k]});
+  var t=ids.map(function(k){var i=byId[k];return '['+i.id+'] '+SIDE[i.side]+' '+i.pri+' '+i.title+'（'+i.module+'）'}).join('\n');
+  var done=function(){var c=document.getElementById('copied');c.textContent='已复制';setTimeout(function(){c.textContent=''},1500)};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fallback(t,done)})}else fallback(t,done);
+}
+function fallback(t,done){var a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');done()}catch(e){}document.body.removeChild(a)}
+var presList=[],presIdx=0;
+function presShow(){var i=presList[presIdx];if(!i)return;
+  document.getElementById('presBody').innerHTML=detailHtml(i).replace(/<div style="margin-top:20px">.*<\/div>$/,'');
+  document.getElementById('presPos').textContent=(presIdx+1)+' / '+presList.length;document.getElementById('pres').scrollTop=0}
+function presOpen(startId){presList=filtered();if(!presList.length)return;presIdx=Math.max(0,presList.map(function(x){return x.id}).indexOf(startId));
+  var p=document.getElementById('pres');p.classList.add('on');p.setAttribute('aria-hidden','false');closeDrawer();presShow()}
+function presClose(){var p=document.getElementById('pres');p.classList.remove('on');p.setAttribute('aria-hidden','true')}
+function update(){renderFilters();render();selUpdate()}
+
+document.getElementById('board').addEventListener('click',function(e){
+  var pk=e.target.getAttribute&&e.target.getAttribute('data-pick');
+  if(pk){SEL[pk]=e.target.checked;if(!SEL[pk])delete SEL[pk];saveSel();e.target.closest('.card').classList.toggle('sel',!!SEL[pk]);selUpdate();return}
+  var c=e.target.closest('.card');if(c)openDrawer(c.getAttribute('data-id'))});
+document.getElementById('board').addEventListener('keydown',function(e){
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('card')){e.preventDefault();openDrawer(e.target.getAttribute('data-id'))}});
+document.getElementById('drawer').addEventListener('click',function(e){
+  var g=e.target.getAttribute('data-go');if(g){openDrawer(g);return}
+  if(e.target.id==='dClose')closeDrawer()});
+document.getElementById('q').addEventListener('input',function(e){F.q=e.target.value;render()});
+document.getElementById('reset').onclick=function(){F.side={};F.mod={};F.pri={};F.st={pool:1,doing:1,done:1};F.q='';document.getElementById('q').value='';update()};
+document.getElementById('copy').onclick=copyText;
+document.getElementById('clr').onclick=function(){SEL={};saveSel();update()};
+document.getElementById('presBtn').onclick=function(){presOpen(openId)};
+document.getElementById('prev').onclick=function(){presIdx=(presIdx-1+presList.length)%presList.length;presShow()};
+document.getElementById('next').onclick=function(){presIdx=(presIdx+1)%presList.length;presShow()};
+document.getElementById('exit').onclick=presClose;
+document.addEventListener('keydown',function(e){
+  var typing=/INPUT|TEXTAREA/.test(document.activeElement&&document.activeElement.tagName);
+  var pres=document.getElementById('pres').classList.contains('on');
+  if(e.key==='Escape'){if(pres)presClose();else closeDrawer();return}
+  if(pres){if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();document.getElementById('next').click()}else if(e.key==='ArrowLeft'){document.getElementById('prev').click()}return}
+  if(!typing&&(e.key==='p'||e.key==='P'))presOpen(openId)});
+stats();update();
+</script>
+</body>
+</html>
