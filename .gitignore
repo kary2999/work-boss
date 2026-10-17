@@ -24,3 +24,7 @@ __pycache__/
 # 第三方網站（UEEX）參考截圖：僅本地對照用，不入庫
 docs/assets/ueex-ref/
 docs/contract-page-breakdown.html
+
+# 使用者提供的參考截圖（登入後頁面等）：私有，不入庫
+参考图组/
+docs/contract-app-breakdown.html
