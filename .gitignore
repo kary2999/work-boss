@@ -20,3 +20,7 @@ docs/master-spec.html
 __pycache__/
 *.pyc
 .DS_Store
+
+# 第三方網站（UEEX）參考截圖：僅本地對照用，不入庫
+docs/assets/ueex-ref/
+docs/contract-page-breakdown.html
