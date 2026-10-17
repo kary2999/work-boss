@@ -118,6 +118,10 @@ class PagesTests(unittest.TestCase):
         self.assertNotIn("![", "\n".join(c["chunks"]))
         self.assertIn("画图", "\n".join(c["chunks"]))
 
+    def test_hash_changes_with_captions(self):
+        c = next(p for p in self.pages if p["key"] == "card:S01")
+        self.assertNotEqual(ws.page_hash(c), ws.page_hash(dict(c, captions=["另一个注释"])))
+
     def test_log_pages(self):
         logs = [p for p in self.pages if p["parent"] == "logs"]
         self.assertEqual(len(logs), 2)

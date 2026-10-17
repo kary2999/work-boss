@@ -49,6 +49,10 @@ def collect(root=ROOT):
     for t in tasks:
         meta, _ = bd.split_front(open(os.path.join(root, "tasks", t["file"]), encoding="utf-8").read())
         t["images"] = [x.strip() for x in meta.get("images", "").split("|") if x.strip()]
+        notes = [x.strip() for x in meta.get("image_notes", "").split("|")]
+        alts = re.findall(r"!\[([^\]]*)\]\(", t["body"])
+        t["captions"] = [(notes[i] if i < len(notes) and notes[i] else (alts[i] if i < len(alts) and alts[i] else os.path.splitext(os.path.basename(x))[0]))
+                         for i, x in enumerate(t["images"])]
     return {"today": dt.date.today().isoformat(), "tasks": tasks, "logs": bd.worklogs(), "plans": bd.plans(),
             "min_hours": bd.min_hours(), "progress": _load(os.path.join(sup, "progress.json"), {"days": {}}).get("days", {}),
             "asks": asks, "needs": _load(os.path.join(sup, "needs.json"), {"items": []}).get("items", [])}
@@ -255,7 +259,7 @@ def build_pages(data, now=None):
         if t["status"] == "cancelled":
             continue
         pages.append({"key": "card:" + t["id"], "parent": "cards", "title": "%s %s" % (t["id"], t["title"]),
-                      "chunks": card_page(t, now), "images": list(t.get("images") or [])})
+                      "chunks": card_page(t, now), "images": list(t.get("images") or []), "captions": list(t.get("captions") or [])})
     logs = data["logs"][:MAX_LOG_PAGES]
     idx = table(["时间", "来源", "类型", "旷工"], [["%s %s" % (l["date"], l["time"]), l["agent"], l["task"], "是" if l.get("absent") else ""] for l in logs])
     pages.append({"key": "logs", "parent": "hub", "title": "工作日志", "images": [],
@@ -383,6 +387,7 @@ def page_hash(spec):
     import hashlib
     chunks = [re.sub(r"最近更新：\d{4}-\d{2}-\d{2} \d{2}:\d{2}", "最近更新：-", c) for c in spec["chunks"]]  # 时间戳不算内容变化
     h = hashlib.sha1(json.dumps([spec["title"], chunks], ensure_ascii=False).encode())
+    h.update(json.dumps(spec.get("captions") or [], ensure_ascii=False).encode())
     for p in spec["images"]:
         ap = os.path.join(ROOT, p)
         try:
@@ -427,7 +432,7 @@ def upload_image(L, token, doc, block_id, path):
                   {"replace_image": {"token": ft}}, token), "绑定图片")
 
 
-def write_doc(L, token, doc, chunks, images, sleep=0.1):
+def write_doc(L, token, doc, chunks, images, sleep=0.1, captions=None):
     """整页重写：清空 → 逐段 Markdown 转块写入 → 末尾追加图片块。"""
     base = "/open-apis/docx/v1/documents/%s" % doc
     d = _check(lcall(L, "GET", base + "/blocks/%s/children?page_size=500" % doc, None, token), "读取页面内容")
@@ -446,7 +451,8 @@ def write_doc(L, token, doc, chunks, images, sleep=0.1):
         pos += len(first)
         time.sleep(sleep)
     miss = []
-    for p in images:
+    captions = captions or []
+    for n_img, p in enumerate(images):
         ap = os.path.join(ROOT, p)
         if not os.path.isfile(ap):
             miss.append(p)
@@ -455,6 +461,11 @@ def write_doc(L, token, doc, chunks, images, sleep=0.1):
                           {"children": [{"block_type": 27, "image": {}}], "index": pos}, token), "新建图片块")
         upload_image(L, token, doc, r["children"][0]["block_id"], ap)
         pos += 1
+        cap = captions[n_img] if n_img < len(captions) else ""
+        if cap:  # 图片下方的注释文字
+            _check(lcall(L, "POST", base + "/blocks/%s/children?document_revision_id=-1" % doc,
+                         {"children": [{"block_type": 2, "text": {"elements": [{"text_run": {"content": "图%d：%s" % (n_img + 1, cap)}}]}}], "index": pos}, token), "写入图片注释")
+            pos += 1
         time.sleep(sleep)
     return pos, miss
 
@@ -484,7 +495,7 @@ def publish_pages(pages, cfg, only_changed=True, log=print, workers=6):
 
     def work(item):
         spec, rec, h = item
-        _, miss = write_doc(L, token, rec["obj"], spec["chunks"], spec["images"])
+        _, miss = write_doc(L, token, rec["obj"], spec["chunks"], spec["images"], captions=spec.get("captions"))
         with lock:
             rec["hash"] = h
             save_state(st)
