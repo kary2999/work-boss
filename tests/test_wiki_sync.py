@@ -94,5 +94,38 @@ class CleanBlocksTests(unittest.TestCase):
         self.assertIn("merge_info", src[1]["table"]["property"])  # 不改原数据
 
 
+class PagesTests(unittest.TestCase):
+    def setUp(self):
+        d = sample()
+        d["tasks"][0].update({"images": ["参考图组/a.jpg", "参考图组/b.jpg"], "body": "## 目标\n画图\n\n![x](a.jpg)\n- [ ] 验收", "blocked_by": "", "done": 0, "total": 1})
+        d["tasks"][1].update({"images": [], "body": "正文", "blocked_by": "[S01]", "done": 0, "total": 0})
+        d["tasks"][2].update({"images": [], "body": "旧", "blocked_by": "", "done": 0, "total": 0})
+        self.pages = ws.build_pages(d, now=dt.datetime(2026, 10, 17, 20, 0))
+
+    def test_tree_order_parents_first(self):
+        seen = set()
+        for p in self.pages:
+            self.assertTrue(p["parent"] is None or p["parent"] in seen, p["key"])
+            seen.add(p["key"])
+        self.assertEqual(self.pages[0]["title"], "工作计划")
+
+    def test_card_pages_carry_images_and_drop_image_lines(self):
+        c = next(p for p in self.pages if p["key"] == "card:S01")
+        self.assertEqual(c["images"], ["参考图组/a.jpg", "参考图组/b.jpg"])
+        self.assertNotIn("![", "\n".join(c["chunks"]))
+        self.assertIn("画图", "\n".join(c["chunks"]))
+
+    def test_log_pages(self):
+        logs = [p for p in self.pages if p["parent"] == "logs"]
+        self.assertEqual(len(logs), 2)
+
+    def test_hash_ignores_timestamp_but_not_content(self):
+        a = dict(self.pages[1])
+        b = dict(a, chunks=[c.replace("20:00", "21:30") for c in a["chunks"]])
+        c = dict(a, chunks=a["chunks"] + ["新增"])
+        self.assertEqual(ws.page_hash(a), ws.page_hash(b))
+        self.assertNotEqual(ws.page_hash(a), ws.page_hash(c))
+
+
 if __name__ == "__main__":
     unittest.main()

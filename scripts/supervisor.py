@@ -880,7 +880,7 @@ def refresh_wiki(dry):
         return
     try:
         r = subprocess.run([sys.executable, "-X", "utf8", "-I", os.path.join(ROOT, "scripts", "wiki_sync.py")],
-                           capture_output=True, text=True, timeout=240, cwd=ROOT)
+                           capture_output=True, text=True, timeout=900, cwd=ROOT)
         if r.returncode != 0:
             print("知识库同步失败：" + (r.stderr or r.stdout).strip()[:300], file=sys.stderr)
     except Exception as e:
