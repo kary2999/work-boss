@@ -29,6 +29,8 @@ main{padding:16px}
 .s-blocked{background:var(--bad-bg);color:var(--bad)}.s-absent{background:var(--bad-bg);color:var(--bad)}
 .s-cancelled{background:var(--code);color:var(--sub);text-decoration:line-through}
 .doc img{max-width:260px;border:1px solid var(--line);border-radius:8px}
+.note{background:var(--warn-bg);border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:13.5px}
+.note code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:12px;word-break:break-all}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .col h3{margin:0 0 8px;font-size:14px}
 .item{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
@@ -227,6 +229,22 @@ function logsView(){
   list.forEach(function(x){if(x.date!==last){h+='<div class="day">'+esc(x.date||'未知日期')+'</div>';last=x.date}h+=logItem(x)});
   return h;
 }
+function imgHint(){
+  var doc=document.querySelector('.doc');
+  if(!doc||doc.querySelector('.note'))return;
+  var d=document.createElement('div');d.className='note';
+  d.innerHTML='<b>参考图没能加载。</b>预览窗格（静态快照）无法加载本地图片。请用下面任一方式打开本页：'+
+    '<br>① 用浏览器打开：<code>open docs/dashboard.html</code>'+
+    '<br>② 运行 <code>python3 scripts/serve_dashboard.py 8777</code>，再访问 <code>http://127.0.0.1:8777/docs/dashboard.html</code>'+
+    '<br>图片原文件在 <code>参考图组/</code>，同样已作为附件挂在对应的 Lark 任务上。';
+  doc.insertBefore(d,doc.firstChild);
+}
+function watchImgs(){
+  Array.prototype.forEach.call(document.querySelectorAll('.doc img'),function(im){
+    if(im.complete&&im.naturalWidth===0)imgHint();
+    im.onerror=imgHint;
+  });
+}
 function render(){
   document.getElementById('gen').textContent='数据生成于 '+DATA.generated+'（重新执行 scripts/build_dashboard.py 后刷新页面）';
   Array.prototype.forEach.call(document.querySelectorAll('#nav button'),function(b){b.classList.toggle('on',b.dataset.v===state.view)});
@@ -235,6 +253,7 @@ function render(){
   Array.prototype.forEach.call(v.querySelectorAll('[data-task]'),function(e){e.onclick=function(){state.view='tasks';state.openTask=e.dataset.task;render();scrollTo(0,0)}});
   Array.prototype.forEach.call(v.querySelectorAll('[data-log]'),function(e){e.onclick=function(){state.view='logs';state.openLog=e.dataset.log;render();scrollTo(0,0)}});
   var b=document.getElementById('back');if(b)b.onclick=function(){state.openTask=null;state.openLog=null;render()};
+  watchImgs();
   var fa=document.getElementById('fa');if(fa){
     fa.onchange=function(){state.agent=fa.value;render()};
     document.getElementById('ft').onchange=function(){state.task=this.value;render()};
