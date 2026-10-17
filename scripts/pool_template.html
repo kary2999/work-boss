@@ -106,7 +106,7 @@ input[type=search]{border:1px solid var(--line);background:var(--card);border-ra
 
 <script>
 var POOL = /*__POOL__*/null;
-var SIDE={FE:'前端',BE:'后端',QA:'测试',PM:'产品/待决策'}, SIDEC={FE:'var(--fe)',BE:'var(--be)',QA:'var(--qa)',PM:'var(--pm)'};
+var SIDE={FE:'前端',BE:'后端',PM:'产品原型',QA:'测试'}, SIDEC={FE:'var(--fe)',BE:'var(--be)',QA:'var(--qa)',PM:'var(--pm)'};
 var PRIC={'P0':'var(--p0)','P1':'var(--p1)','P2':'var(--p2)','—':'var(--p2)'};
 var STL={pool:'需求池',doing:'进行中',done:'已完成',out:'本期不做'};
 var items=POOL.items, byId={}; items.forEach(function(i){byId[i.id]=i});
@@ -153,7 +153,7 @@ function cardHtml(i){
   return '<div class="card'+(SEL[i.id]?' sel':'')+(st(i)==='out'?' out':'')+'" tabindex="0" role="button" data-id="'+esc(i.id)+'" style="--sidec:'+SIDEC[i.side]+'" aria-label="'+esc(i.id+' '+i.title)+'">'+
    '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span>'+
    '<span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+(i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">'+esc(i.size)+'</span>':'')+
-   (i.side!=='PM'?'<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>':'')+(i.owner?'<span class="tag" style="color:var(--accent)">'+esc(i.owner)+'</span>':'')+(st(i)!=='pool'?'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>':'')+
+   '<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>'+(i.kind==='decision'?'<span class="tag" style="color:var(--p1)">待决策</span>':'')+(i.owner?'<span class="tag" style="color:var(--accent)">'+esc(i.owner)+'</span>':'')+(st(i)!=='pool'?'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>':'')+
    '<label class="pick"><span class="sr">选择 '+esc(i.id)+'</span><input type="checkbox" data-pick="'+esc(i.id)+'"'+(SEL[i.id]?' checked':'')+'></label></div>'+
    '<div class="t">'+esc(i.title)+'</div><div class="what">'+esc(i.what)+'</div>'+
    '<div class="meta"><span>'+esc(i.module)+'</span>'+(i.prd?'<span>PRD '+esc(i.prd)+'</span>':'')+((i.deps||[]).length?'<span>依赖 '+i.deps.length+'</span>':'')+
@@ -161,18 +161,18 @@ function cardHtml(i){
 }
 var WAVE={};
 (function(){function w(id,seen){if(WAVE[id]!=null)return WAVE[id];if(seen[id])return 1;seen[id]=1;
-  var m=0;((byId[id]||{}).deps||[]).forEach(function(d){if(byId[d]&&byId[d].side!=='PM')m=Math.max(m,w(d,seen))});WAVE[id]=m+1;return WAVE[id]}
+  var m=0;((byId[id]||{}).deps||[]).forEach(function(d){if(byId[d])m=Math.max(m,w(d,seen))});WAVE[id]=m+1;return WAVE[id]}
   items.forEach(function(i){w(i.id,{})})})();
 var DAYS={S:1,M:2.5,L:4};
 function renderLanes(list){
-  var dirs=['FE','BE','QA'], by={};
+  var dirs=['FE','BE','PM'], by={};
   dirs.forEach(function(d){by[d]=list.filter(function(i){return i.side===d&&st(i)!=='out'}).sort(function(a,b){return WAVE[a.id]-WAVE[b.id]||(a.id<b.id?-1:1)})});
-  var rest=list.filter(function(i){return i.side==='PM'||st(i)==='out'});
+  var rest=list.filter(function(i){return dirs.indexOf(i.side)<0||st(i)==='out'});
   var h='<div class="lanes">'+dirs.map(function(d){
     var l=by[d], days=l.reduce(function(a,i){return a+(DAYS[i.size]||0)},0), last=0, body='';
     l.forEach(function(i){ if(WAVE[i.id]!==last){last=WAVE[i.id];body+='<div class="wave">批次 '+last+(last===1?'（可先开工）':'（依赖前面批次）')+'</div>'} body+=cardHtml(i)});
     return '<div class="lane" style="--sidec:'+SIDEC[d]+'"><div class="lh">'+esc(SIDE[d])+' · '+l.length+' 条<small>初估约 '+days+' 人天（S=1、M=2.5、L=4 的粗算，待研发评估）</small></div>'+(body||'<div class="empty">无</div>')+'</div>'}).join('')+'</div>';
-  if(rest.length)h+='<div class="strip"><div class="group">待决策 / 本期不做<small>'+rest.length+' 条，不分配给研发；待决策项会阻塞相关需求</small></div><div class="grid">'+rest.map(cardHtml).join('')+'</div></div>';
+  if(rest.length)h+='<div class="strip"><div class="group">测试 / 本期不做<small>'+rest.length+' 条，不属于三个方向；测试随功能验收</small></div><div class="grid">'+rest.map(cardHtml).join('')+'</div></div>';
   return h}
 function groupsOf(list){
   if(F.group==='flat')return [{name:'',list:list}];
@@ -194,7 +194,7 @@ function stats(){
   var act=items.filter(function(i){return st(i)!=='out'});
   function n(f){return act.filter(f).length}
   var h=[['需求总数',act.length],['前端',n(function(i){return i.side==='FE'})],['后端',n(function(i){return i.side==='BE'})],['测试',n(function(i){return i.side==='QA'})],
-    ['待决策',n(function(i){return i.side==='PM'})],['P0',n(function(i){return i.pri==='P0'})],['有待确认项',n(function(i){return (i.open||[]).length>0})],
+    ['产品原型',n(function(i){return i.side==='PM'})],['P0',n(function(i){return i.pri==='P0'})],['有待确认项',n(function(i){return (i.open||[]).length>0})],
     ['本期不做',items.length-act.length]];
   document.getElementById('stats').innerHTML=h.map(function(x){return '<div class="stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
 }
@@ -202,7 +202,7 @@ function depChip(id){var d=byId[id];return '<button class="chip dep" type="butto
 function detailHtml(i){
   var dependents=items.filter(function(x){return (x.deps||[]).indexOf(i.id)>=0});
   return '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span><span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+
-    (i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">初估 '+esc(i.size)+'</span>':'')+'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>'+(i.side!=='PM'?'<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>':'')+(i.owner?'<span class="tag" style="color:var(--accent)">负责：'+esc(i.owner)+'</span>':'')+'</div>'+
+    (i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">初估 '+esc(i.size)+'</span>':'')+'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>'+'<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>'+(i.owner?'<span class="tag" style="color:var(--accent)">负责：'+esc(i.owner)+'</span>':'')+'</div>'+
     '<h2>'+esc(i.title)+'</h2><div class="sub">'+esc(i.module)+(i.prd?' · PRD '+esc(i.prd):'')+'</div>'+
     '<h3>需求说明</h3><div class="what" style="display:block;color:var(--ink)">'+esc(i.what)+'</div>'+
     ((i.accept||[]).length?'<h3>验收标准</h3><ul>'+i.accept.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul>':'')+
