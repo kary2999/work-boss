@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""work-boss 監工執行器：確定性腳本，不依賴任何 LLM，供 macOS launchd（或 cron）定時呼叫。
+"""work-boss 监工执行器：确定性脚本，不依赖任何 LLM，供 macOS launchd（或 cron）定时调用。
 
 子命令:
-  morning   [--date D]   依 plans/D.json 建 Lark 任務（含子任務、順延項改期不重建）並發卡片
-  evening   [--date D]   收集今日完成度，寫 progress 日誌，發進度詢問卡片
-  chase     [--date D]   檢查是否完成／已說明原因／已回覆；否則發催促卡片
-  close     [--date D]   收尾 D（默認昨日）：判定旷工、順延未完成項、定稿次日 plans/、需求不足再要一次
-  sync      [--date D]   白天同步：進度寫回本地、維護次日計畫草案、需求不足時在 Lark 主動要需求、刷新看板
-  plan-carry [--date D]  只做「順延並生成次日計畫」，不發消息、不寫旷工（用於補產出）
-  status    [--date D]   只讀本地檔案，顯示今日任務與提問狀態
+  morning   [--date D]   依 plans/D.json 建 Lark 任务（含子任务、顺延项改期不重建）并发卡片
+  evening   [--date D]   收集今日完成度，写 progress 日志，发进度询问卡片
+  chase     [--date D]   检查是否完成／已说明原因／已回复；否则发催促卡片
+  close     [--date D]   收尾 D（默认昨日）：判定旷工、顺延未完成项、定稿次日 plans/、需求不足再要一次
+  sync      [--date D]   白天同步：进度写回本地、维护次日计划草案、需求不足时在 Lark 主动要需求、刷新看板
+  plan-carry [--date D]  只做“顺延并生成次日计划”，不发消息、不写旷工（用于补产出）
+  status    [--date D]   只读本地文件，显示今日任务与提问状态
 
-每個會與 Lark 互動的命令結束後，都會：①把進度寫進 .supervisor/progress.json 並同步任務卡
-（status／progress）；②讀取使用者對「需求不足」卡片的回覆並併入計畫；③刷新 docs/dashboard.html。
+每个会与 Lark 互动的命令结束后，都会：①把进度写进 .supervisor/progress.json 并同步任务卡
+（status／progress）；②读取用户对“需求不足”卡片的回复并并入计划；③刷新 docs/dashboard.html。
 
-通用選項: --dry-run（不呼叫 Lark 寫入、不寫本地檔，只印出將做什麼；讀取類呼叫仍會執行）、--no-notify
-資料契約見 docs/data-contract.md。
+通用选项: --dry-run（不调用 Lark 写入、不写本地文件，只印出将做什么；读取类调用仍会执行）、--no-notify
+数据契约见 docs/data-contract.md。
 """
 import argparse
 import datetime as dt
@@ -33,14 +33,14 @@ PLANS = os.path.join(ROOT, "plans")
 TASKS = os.path.join(ROOT, "tasks")
 WINDOWS = [("09:00", "12:00"), ("14:00", "18:00")]
 DAY_CAP_HOURS = 7.0
-DEFAULT_MIN_HOURS = 4.0   # 當日計畫低於此工時視為「需求不足」；可用 config 的 min_plan_hours 或環境變數覆蓋
-ASK_MAX = 3               # 對同一天的「需求不足」最多主動要幾次（收尾的最後一次不計）
-ASK_INTERVAL_MIN = 90     # 兩次主動要需求之間的最短間隔（分鐘）
-DASHBOARD = True          # 命令結束後是否刷新看板；測試時關閉
-HINT = "【完成請直接勾選；未完成請在『評論』說明原因】"
+DEFAULT_MIN_HOURS = 4.0   # 当日计划低于此工时视为“需求不足”；可用 config 的 min_plan_hours 或环境变量覆盖
+ASK_MAX = 3               # 对同一天的“需求不足”最多主动要几次（收尾的最后一次不计）
+ASK_INTERVAL_MIN = 90     # 两次主动要需求之间的最短间隔（分钟）
+DASHBOARD = True          # 命令结束后是否刷新看板；测试时关闭
+HINT = "【完成请直接勾选；未完成请在‘评论’说明原因】"
 
 
-# ---------- 純函數（有單元測試） ----------
+# ---------- 纯函数（有单元测试） ----------
 def hm_to_min(s):
     h, m = s.split(":")
     return int(h) * 60 + int(m)
@@ -59,8 +59,8 @@ def split_slot(slot):
 
 
 def pack_slots(items, windows=None, hard_end="22:00", start_after=None):
-    """依序把 items（需含 est_hours）排進工作時段，返回新列表（含 slot，排不下為 None）。
-    start_after（分鐘）：從這個時間點之後開始排，用於往已有計畫後面追加。"""
+    """依序把 items（需含 est_hours）排进工作时段，返回新列表（含 slot，排不下为 None）。
+    start_after（分钟）：从这个时间点之后开始排，用于往已有计划后面追加。"""
     windows = windows or WINDOWS
     wins = [(hm_to_min(a), hm_to_min(b)) for a, b in windows]
     wi, cursor = 0, wins[0][0]
@@ -70,7 +70,7 @@ def pack_slots(items, windows=None, hard_end="22:00", start_after=None):
             wi += 1
     out = []
     for it in items:
-        need = int(-(-float(it.get("est_hours", 1.0)) * 60 // 15) * 15)  # 向上取整到 15 分鐘
+        need = int(-(-float(it.get("est_hours", 1.0)) * 60 // 15) * 15)  # 向上取整到 15 分钟
         placed = None
         while wi < len(wins):
             s, e = wins[wi]
@@ -79,11 +79,11 @@ def pack_slots(items, windows=None, hard_end="22:00", start_after=None):
                 placed = (cursor, cursor + need)
                 cursor += need
                 break
-            if need > e - s and cursor == s:  # 比整個視窗還長：從視窗起點硬排，不拆分
+            if need > e - s and cursor == s:  # 比整个窗口还长：从窗口起点硬排，不拆分
                 if cursor + need <= hm_to_min(hard_end):
                     placed = (cursor, cursor + need)
                     cursor += need
-                    # 後續視窗若已被覆蓋則前移
+                    # 后续窗口若已被覆盖则前移
                     while wi + 1 < len(wins) and wins[wi + 1][0] < cursor:
                         wi += 1
                     break
@@ -107,7 +107,7 @@ def parse_summary(s):
 
 
 def decide_absent(results, user_reply_count):
-    """旷工 = 沒有任何主任務完成、沒有任何使用者評論、對提問也沒有回覆。"""
+    """旷工 = 没有任何主任务完成、没有任何用户评论、对提问也没有回复。"""
     responded = (any(r["completed"] for r in results)
                  or any(r["reasons"] for r in results)
                  or user_reply_count > 0)
@@ -115,7 +115,7 @@ def decide_absent(results, user_reply_count):
 
 
 def parse_needs_text(text):
-    """使用者對「需求不足」卡片的回覆 → [(標題, 估時)]。每行一條；行內的「2h／1.5小時」是估時，缺省 1h。"""
+    """用户对“需求不足”卡片的回复 → [(标题, 估时)]。每行一条；行内的“2h／1.5小时”是估时，缺省 1h。"""
     text = re.sub(r"@_user_\d+", "", text or "")
     out = []
     for line in text.replace("；", "\n").replace(";", "\n").splitlines():
@@ -123,7 +123,7 @@ def parse_needs_text(text):
         if not line:
             continue
         est = 1.0
-        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:h|H|小時|小时)", line)
+        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:h|H|小时|小时)", line)
         if m:
             est = min(max(float(m.group(1)), 0.25), 8.0)
             line = (line[:m.start()] + line[m.end():]).strip(" ，,、:：-")
@@ -137,7 +137,7 @@ def plan_total_hours(plan):
 
 
 def set_front(text, key, value):
-    """改（或補）任務卡 front matter 裡的 key，保留行尾註解與正文；無變化時原樣返回。"""
+    """改（或补）任务卡 front matter 里的 key，保留行尾注解与正文；无变化时原样返回。"""
     m = re.match(r"^---\n(.*?)\n---\n?(.*)$", text, re.S)
     if not m:
         return text
@@ -156,7 +156,7 @@ def set_front(text, key, value):
 
 
 def card_status(current, done, total):
-    """依 Lark 進度推導任務卡 status。只往前走：不降級，不碰 done/blocked，done 必須由人確認。"""
+    """依 Lark 进度推导任务卡 status。只往前走：不降级，不碰 done/blocked，done 必须由人确认。"""
     if current in ("review", "done", "blocked", "cancelled"):
         return current
     if total > 0 and done == total:
@@ -167,7 +167,7 @@ def card_status(current, done, total):
 
 
 def ask_allowed(entry, now, final=False):
-    """對同一天『需求不足』的主動詢問是否允許：次數與間隔限制；收尾（final）可再要一次。"""
+    """对同一天‘需求不足’的主动询问是否允许：次数与间隔限制；收尾（final）可再要一次。"""
     entry = entry or {}
     count = entry.get("count", 0)
     if final:
@@ -181,8 +181,8 @@ def ask_allowed(entry, now, final=False):
 
 
 def build_next_plan(results, backlog, next_day, cap=DAY_CAP_HOURS, extra=None, cancelled=None):
-    """順延未完成項（排最前，沿用原 Lark 任務）+ 使用者主動補充的需求 + backlog，補到工時上限，再排時段。
-    cancelled：已作廢的任務卡 id，其未完成的 Lark 任務不再順延。"""
+    """顺延未完成项（排最前，沿用原 Lark 任务）+ 用户主动补充的需求 + backlog，补到工时上限，再排时段。
+    cancelled：已作废的任务卡 id，其未完成的 Lark 任务不再顺延。"""
     carried = []
     for r in results:
         if r["completed"]:
@@ -218,7 +218,7 @@ def build_next_plan(results, backlog, next_day, cap=DAY_CAP_HOURS, extra=None, c
             "total_hours": round(total, 2), "deferred": deferred, "items": items}
 
 
-# ---------- 檔案與狀態 ----------
+# ---------- 文件与状态 ----------
 def load_json(path, default=None):
     if not os.path.exists(path):
         return default
@@ -271,10 +271,10 @@ def min_plan_hours():
 def write_worklog(name, text, dry):
     path = os.path.join(WORKLOG, name)
     if dry:
-        print("[dry-run] 寫日誌 %s\n%s" % (name, text))
+        print("[dry-run] 写日志 %s\n%s" % (name, text))
         return path
     os.makedirs(WORKLOG, exist_ok=True)
-    if os.path.exists(path):  # 日誌只新增，不改既有
+    if os.path.exists(path):  # 日志只新增，不改既有
         return path
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
@@ -282,7 +282,7 @@ def write_worklog(name, text, dry):
 
 
 def read_backlog():
-    """tasks/*.md（非範本）中 status 為 todo/doing 的任務卡 → 計畫條目。"""
+    """tasks/*.md（非模板）中 status 为 todo/doing 的任务卡 → 计划条目。"""
     items = []
     for p in sorted(glob.glob(os.path.join(TASKS, "*.md"))):
         if os.path.basename(p).startswith("_"):
@@ -311,7 +311,7 @@ def read_backlog():
 
 
 def read_cancelled_refs():
-    """status 為 cancelled 的任務卡 id：已作廢，不再進 backlog，也不再被順延。"""
+    """status 为 cancelled 的任务卡 id：已作废，不再进 backlog，也不再被顺延。"""
     out = set()
     for p in sorted(glob.glob(os.path.join(TASKS, "*.md"))):
         if os.path.basename(p).startswith("_"):
@@ -326,9 +326,9 @@ def read_cancelled_refs():
     return out
 
 
-# ---------- Lark 客戶端 ----------
+# ---------- Lark 客户端 ----------
 class LarkCLI(object):
-    """透過 scripts/lark_ops.py 呼叫 Lark（只用 REST，不開長連接）。"""
+    """通过 scripts/lark_ops.py 调用 Lark（只用 REST，不开长连接）。"""
 
     def _run(self, args):
         p = subprocess.run(OPS + args, capture_output=True, text=True, timeout=120)
@@ -371,7 +371,7 @@ class LarkCLI(object):
 
     def task_get_many(self, guids):
         out = {}
-        for i in range(0, len(guids), 40):  # 分批，避免命令列過長
+        for i in range(0, len(guids), 40):  # 分批，避免命令行过长
             for r in self._run(["task-get"] + guids[i:i + 40]):
                 if "error" in r:
                     raise RuntimeError("%s: %s" % (r.get("guid"), r["error"]))
@@ -402,7 +402,7 @@ class LarkCLI(object):
 
 
 class DryLark(LarkCLI):
-    """--dry-run：讀取類呼叫照常執行；寫入類只印出。"""
+    """--dry-run：读取类调用照常执行；写入类只印出。"""
 
     def __init__(self):
         self.n = 0
@@ -413,20 +413,20 @@ class DryLark(LarkCLI):
         return "dry-%d" % self.n
 
     def task_create(self, summary, desc, start, due):
-        return {"guid": self._fake("建任務 %s（%s → %s）" % (summary, start, due)), "url": "https://example.invalid/task"}
+        return {"guid": self._fake("建任务 %s（%s → %s）" % (summary, start, due)), "url": "https://example.invalid/task"}
 
     def subtask_create(self, parent, summary, due, assign=False):
-        return {"guid": self._fake("  建子任務 %s" % summary), "url": ""}
+        return {"guid": self._fake("  建子任务 %s" % summary), "url": ""}
 
     def task_update(self, guid, summary=None, desc=None, start=None, due=None):
-        return {"guid": guid, "updated": [self._fake("改任務 %s → %s（%s → %s）" % (guid, summary, start, due))]}
+        return {"guid": guid, "updated": [self._fake("改任务 %s → %s（%s → %s）" % (guid, summary, start, due))]}
 
     def attach(self, guid, paths):
-        self._fake("  掛附件 %s → %s" % ([os.path.basename(p) for p in paths], guid))
+        self._fake("  挂附件 %s → %s" % ([os.path.basename(p) for p in paths], guid))
         return [{"file": p, "ok": True} for p in paths]
 
     def card(self, title, template, md, subtitle=None, footer=None):
-        print("[dry-run] 發卡片 [%s] %s %s\n%s\n-- %s" % (template, title, subtitle or "", md, footer or ""))
+        print("[dry-run] 发卡片 [%s] %s %s\n%s\n-- %s" % (template, title, subtitle or "", md, footer or ""))
         return self._fake("card")
 
 
@@ -434,13 +434,13 @@ def notify(text, dry):
     if dry or os.environ.get("WORK_BOSS_NO_NOTIFY"):
         return
     try:
-        subprocess.run(["osascript", "-e", 'display notification "%s" with title "監工"' % text.replace('"', "'")[:180]],
+        subprocess.run(["osascript", "-e", 'display notification "%s" with title "监工"' % text.replace('"', "'")[:180]],
                        capture_output=True, timeout=10)
     except Exception:
         pass
 
 
-# ---------- 業務流程 ----------
+# ---------- 业务流程 ----------
 def slot_range(day, slot):
     a, b = split_slot(slot)
     if not a:
@@ -465,7 +465,7 @@ def collect_results(state, client, with_comments=True):
     for e in state:
         guids.append(e["guid"])
         guids += [s["guid"] for s in e.get("subtasks", [])]
-    got = _get_many(client, guids)  # 批量讀：一次命令讀一批，避免每個任務都新開進程換令牌
+    got = _get_many(client, guids)  # 批量读：一次命令读一批，避免每个任务都新开进程换令牌
     open_mains = [e["guid"] for e in state if not got[e["guid"]]["completed"]]
     cmts = _comments_many(client, open_mains) if (with_comments and open_mains) else {}
     res = []
@@ -497,8 +497,8 @@ def md_table(rows, header):
 
 
 def attach_images(client, guid, images):
-    """把計畫項的參考圖作為附件掛到 Lark 任務。路徑相對倉庫根目錄。
-    單張失敗不影響整體（任務已建好）；返回成功掛上的檔名。"""
+    """把计划项的参考图作为附件挂到 Lark 任务。路径相对仓库根目录。
+    单张失败不影响整体（任务已建好）；返回成功挂上的文件名。"""
     paths = [p if os.path.isabs(p) else os.path.join(ROOT, p) for p in images]
     ok = []
     try:
@@ -506,9 +506,9 @@ def attach_images(client, guid, images):
             if row.get("ok"):
                 ok.append(os.path.basename(row["file"]))
             else:
-                print("附件失敗：%s %s" % (row.get("file"), row.get("error")), file=sys.stderr)
+                print("附件失败：%s %s" % (row.get("file"), row.get("error")), file=sys.stderr)
     except Exception as e:
-        print("附件上傳異常：%s" % str(e)[:200], file=sys.stderr)
+        print("附件上传异常：%s" % str(e)[:200], file=sys.stderr)
     return ok
 
 
@@ -518,18 +518,18 @@ def cmd_morning(day, client, dry, force=False):
 
 
 def _morning_core(day, client, dry, force=False):
-    new_needs = ingest_requirements(client, day, dry)  # 夜裡使用者對「需求不足」卡片的回覆
+    new_needs = ingest_requirements(client, day, dry)  # 夜里用户对“需求不足”卡片的回复
     plan = load_json(p_plan(day))
     if plan is None:
-        plan = refresh_plan(day, [], client, dry, final=True)  # 沒有計畫檔：用補充需求與 backlog 自動生成
+        plan = refresh_plan(day, [], client, dry, final=True)  # 没有计划文件：用补充需求与 backlog 自动生成
     elif new_needs:
         plan = append_needs(plan, new_needs, day, dry)
     if not plan or not plan.get("items"):
-        client.card("今日無工作計畫", "grey",
-                    "**%s 沒有可排的工作**（沒有計畫檔、沒有補充需求、backlog 也是空的）。\n請回覆下一張「需求不足」卡片，或補任務卡／計畫檔。" % day,
-                    subtitle=day, footer="監工 · 計畫檔格式見 plans/_TEMPLATE.json")
+        client.card("今日无工作计划", "grey",
+                    "**%s 没有可排的工作**（没有计划文件、没有补充需求、backlog 也是空的）。\n请回复下一张“需求不足”卡片，或补任务卡／计划文件。" % day,
+                    subtitle=day, footer="监工 · 计划文件格式见 plans/_TEMPLATE.json")
         maybe_ask(client, plan or {"items": []}, day, dry, final=False)
-        print("無可排的工作，已發提示並要需求")
+        print("无可排的工作，已发提示并要需求")
         return
     maybe_ask(client, plan, day, dry, final=False)
     state = load_json(p_state_tasks(day), [])
@@ -542,18 +542,18 @@ def _morning_core(day, client, dry, force=False):
         ref = it.get("ref") or it["id"]
         slot_label = (it.get("slot") or "待排").replace("-", "–")
         summary = "[%s] %s %s" % (ref, slot_label, it["title"])
-        desc = "時段：%s %s（約 %sh）\n" % (day, slot_label, it.get("est_hours", 1))
+        desc = "时段：%s %s（约 %sh）\n" % (day, slot_label, it.get("est_hours", 1))
         if it.get("done_std"):
-            desc += "完成標準：%s\n" % it["done_std"]
+            desc += "完成标准：%s\n" % it["done_std"]
         if it.get("carried"):
-            desc += "【順延項】%s\n" % (it.get("carry_reason") or "昨日未完成")
+            desc += "【顺延项】%s\n" % (it.get("carry_reason") or "昨日未完成")
         if it.get("images"):
-            desc += "參考圖（已作為附件上傳）：%s\n" % "、".join(os.path.basename(p) for p in it["images"])
+            desc += "参考图（已作为附件上传）：%s\n" % "、".join(os.path.basename(p) for p in it["images"])
         desc += HINT
         entry = {"id": it["id"], "summary": summary, "slot": slot_label, "est_hours": it.get("est_hours", 1.0),
                  "done_std": it.get("done_std", ""), "carried": bool(it.get("carried")), "subtasks": []}
-        if it.get("guid"):  # 順延項：沿用原任務，只改期，不重複建立
-            # 順延項只改標題與起止時間，不動描述：描述裡可能有人或 agent 補充的規範與說明
+        if it.get("guid"):  # 顺延项：沿用原任务，只改期，不重复建立
+            # 顺延项只改标题与起止时间，不动描述：描述里可能有人或 agent 补充的规范与说明
             client.task_update(it["guid"], summary=summary, start=start, due=due)
             entry["guid"], entry["url"] = it["guid"], it.get("url", "")
             for s in it.get("subtasks", []):
@@ -579,21 +579,21 @@ def _morning_core(day, client, dry, force=False):
         if not dry:
             save_json(p_state_tasks(day), state)
     if not (created or rescheduled or force):
-        print("今日任務已建立，無新增項；不重發卡片")
+        print("今日任务已建立，无新增项；不重发卡片")
         return
     rows = []
     total = 0.0
     for e in state:
         total += float(e.get("est_hours", 0))
-        mark = "（順延）" if e.get("carried") else ""
+        mark = "（顺延）" if e.get("carried") else ""
         title = parse_summary(e["summary"])[1]
-        link = "[打開](%s)" % e["url"] if e.get("url") else ""
+        link = "[打开](%s)" % e["url"] if e.get("url") else ""
         rows.append((e["slot"], title + mark, "%gh" % float(e.get("est_hours", 0)), len(e["subtasks"]), link))
-    md = "**今日目標**：%s\n\n%s\n\n**預計總工時**：約 %.2fh（新建 %d、順延改期 %d）\n\n完成請在 Lark 任務勾選，做不完請在任務『評論』寫原因。" % (
-        plan.get("goal") or "按計畫完成下列工作", md_table(rows, ["時段", "任務", "估時", "子任務", "連結"]), total, created, rescheduled)
-    client.card("今日工作項", "orange", md, subtitle=day,
-                footer="監工 · 20:30 詢問進度；到期未完成將順延並重排明日工作")
-    notify("今日工作項已發出（%d 項，約 %.1fh）" % (len(state), total), dry)
+    md = "**今日目标**：%s\n\n%s\n\n**预计总工时**：约 %.2fh（新建 %d、顺延改期 %d）\n\n完成请在 Lark 任务勾选，做不完请在任务‘评论’写原因。" % (
+        plan.get("goal") or "按计划完成下列工作", md_table(rows, ["时段", "任务", "估时", "子任务", "链接"]), total, created, rescheduled)
+    client.card("今日工作项", "orange", md, subtitle=day,
+                footer="监工 · 20:30 询问进度；到期未完成将顺延并重排明日工作")
+    notify("今日工作项已发出（%d 项，约 %.1fh）" % (len(state), total), dry)
 
 
 def progress_summary(results):
@@ -612,35 +612,35 @@ def cmd_evening(day, client, dry):
 def _evening_core(day, client, dry):
     state = load_json(p_state_tasks(day), [])
     if not state:
-        print("今日無任務狀態，略過")
+        print("今日无任务状态，略过")
         return None
     res = collect_results(state, client)
     done, m, sd, st = progress_summary(res)
     rows = []
     for r in res:
-        status = "✅ 已完成" if r["completed"] else ("📝 有說明" if r["reasons"] else "⬜ 未完成")
+        status = "✅ 已完成" if r["completed"] else ("📝 有说明" if r["reasons"] else "⬜ 未完成")
         note = "；".join(x[:40] for x in r["reasons"]) if r["reasons"] else ""
-        link = "[打開](%s)" % r["url"] if r["url"] else ""
+        link = "[打开](%s)" % r["url"] if r["url"] else ""
         rows.append((r["slot"], parse_summary(r["summary"])[1], status, note, "%d/%d" % (r["subtasks_done"], r["subtasks_total"]), link))
     color = "green" if done == m else ("orange" if done else "red")
-    md = "**完成度** 主任務 %d / %d · 子任務 %d / %d\n\n%s\n\n**請處理**：未完成請在 Lark 點擊完成，或在任務『評論』說明原因。" % (
-        done, m, sd, st, md_table(rows, ["時段", "任務", "狀態", "備註", "子任務", "連結"]))
-    mid = client.card("今日進度詢問", color, md, subtitle=day,
-                      footer="監工 · 每 30 分鐘催促至 24:00；到期仍未完成將順延並重排明日工作")
+    md = "**完成度** 主任务 %d / %d · 子任务 %d / %d\n\n%s\n\n**请处理**：未完成请在 Lark 点击完成，或在任务‘评论’说明原因。" % (
+        done, m, sd, st, md_table(rows, ["时段", "任务", "状态", "备注", "子任务", "链接"]))
+    mid = client.card("今日进度询问", color, md, subtitle=day,
+                      footer="监工 · 每 30 分钟催促至 24:00；到期仍未完成将顺延并重排明日工作")
     q = load_json(p_state_q(day), {"date": day, "question_ids": [], "replied": False, "reminders": 0})
     q["question_ids"].append(mid)
     if done == m:
         q["replied"] = True
     if not dry:
         save_json(p_state_q(day), q)
-    lines = ["# %s 晚間進度（監工自動生成）" % day, "",
-             "- 完成度：主任務 %d/%d，子任務 %d/%d" % (done, m, sd, st), "- 依據：Lark 任務勾選狀態與使用者評論", ""]
+    lines = ["# %s 晚间进度（监工自动生成）" % day, "",
+             "- 完成度：主任务 %d/%d，子任务 %d/%d" % (done, m, sd, st), "- 依据：Lark 任务勾选状态与用户评论", ""]
     for r in res:
         lines.append("- [%s] %s｜%s%s" % ("x" if r["completed"] else " ", r["summary"],
                                          "已完成" if r["completed"] else "未完成",
-                                         ("｜說明：" + "；".join(r["reasons"])) if r["reasons"] else ""))
+                                         ("｜说明：" + "；".join(r["reasons"])) if r["reasons"] else ""))
     write_worklog("%s-2030-supervisor-progress.md" % compact(day), "\n".join(lines) + "\n", dry)
-    notify("晚間進度：完成 %d/%d 項" % (done, m), dry)
+    notify("晚间进度：完成 %d/%d 项" % (done, m), dry)
     return res
 
 
@@ -664,36 +664,36 @@ def _chase_core(day, client, dry):
         user_replies += [r for r in client.replies(mid) if r.get("sender_type") == "user"]
 
     def finish(title, md):
-        lines = ["# %s %s 回報記錄（監工自動生成）" % (day, hhmm), "", "- 完成度：主任務 %d/%d，子任務 %d/%d" % (done, m, sd, st)]
+        lines = ["# %s %s 回报记录（监工自动生成）" % (day, hhmm), "", "- 完成度：主任务 %d/%d，子任务 %d/%d" % (done, m, sd, st)]
         for r in res:
             lines.append("- %s｜%s%s" % (r["summary"], "已完成" if r["completed"] else "未完成",
-                                        ("｜說明：" + "；".join(r["reasons"])) if r["reasons"] else ""))
+                                        ("｜说明：" + "；".join(r["reasons"])) if r["reasons"] else ""))
         for r in user_replies:
-            lines.append("- 回覆：%s" % r.get("text", ""))
+            lines.append("- 回复：%s" % r.get("text", ""))
         write_worklog("%s-%s-supervisor-reply.md" % (compact(day), hhmm), "\n".join(lines) + "\n", dry)
         q["replied"] = True
         if not dry:
             save_json(p_state_q(day), q)
-        client.card(title, "green", md, subtitle=day, footer="監工 · 今日追問結束")
+        client.card(title, "green", md, subtitle=day, footer="监工 · 今日追问结束")
 
     if done == m:
-        finish("今日工作項已全部完成", "主任務 %d / %d 已勾選完成。" % (done, m))
+        finish("今日工作项已全部完成", "主任务 %d / %d 已勾选完成。" % (done, m))
         return res
     if user_replies:
-        finish("已記錄今日回報", "已收到你對提問消息的回覆，已寫入日誌。未完成項將於 00:00 順延。")
+        finish("已记录今日回报", "已收到你对提问消息的回复，已写入日志。未完成项将于 00:00 顺延。")
         return res
     pending = [r for r in res if not r["completed"] and not r["reasons"]]
     if not pending:
-        finish("已記錄未完成原因", "未完成項都已有評論說明，將於 00:00 順延並重排明日工作。")
+        finish("已记录未完成原因", "未完成项都已有评论说明，将于 00:00 顺延并重排明日工作。")
         return res
     q["reminders"] = q.get("reminders", 0) + 1
     rows = [(r["slot"], parse_summary(r["summary"])[1], "%d/%d" % (r["subtasks_done"], r["subtasks_total"]),
-             "[打開](%s)" % r["url"] if r["url"] else "") for r in pending]
-    md = "**未完成 %d / 共 %d 項**\n\n%s\n\n請在 Lark 任務中**點擊完成**；做不完請在評論寫原因。" % (
-        len(pending), m, md_table(rows, ["時段", "任務", "子任務", "連結"]))
-    mid = client.card("第 %d 次催促：請點擊完成" % q["reminders"], "red", md,
+             "[打开](%s)" % r["url"] if r["url"] else "") for r in pending]
+    md = "**未完成 %d / 共 %d 项**\n\n%s\n\n请在 Lark 任务中**点击完成**；做不完请在评论写原因。" % (
+        len(pending), m, md_table(rows, ["时段", "任务", "子任务", "链接"]))
+    mid = client.card("第 %d 次催促：请点击完成" % q["reminders"], "red", md,
                       subtitle=dt.datetime.now().strftime("%H:%M"),
-                      footer="監工 · 到期仍未完成將順延並重新制定明日任務")
+                      footer="监工 · 到期仍未完成将顺延并重新制定明日任务")
     q["question_ids"].append(mid)
     if not dry:
         save_json(p_state_q(day), q)
@@ -705,8 +705,8 @@ def next_day(day):
 
 
 def refresh_plan(target, results, client, dry, final=False):
-    """（重新）生成 target 日的計畫。只覆蓋「監工自己生成」的計畫檔；
-    人或其他 agent 寫的（generated_by 不是 supervisor）原樣保留。返回生效的計畫。"""
+    """（重新）生成 target 日的计划。只覆盖“监工自己生成”的计划文件；
+    人或其他 agent 写的（generated_by 不是 supervisor）原样保留。返回生效的计划。"""
     existing = load_json(p_plan(target))
     if existing is not None and existing.get("generated_by") != "supervisor":
         return existing
@@ -714,7 +714,7 @@ def refresh_plan(target, results, client, dry, final=False):
     plan = build_next_plan(results, read_backlog(), target, extra=needs, cancelled=read_cancelled_refs())
     plan["draft"] = not final
     if dry:
-        print("[dry-run] 將寫 plans/%s.json（%s，約 %sh，%d 項）" % (
+        print("[dry-run] 将写 plans/%s.json（%s，约 %sh，%d 项）" % (
             target, "定稿" if final else "草案", plan["total_hours"], len(plan["items"])))
     else:
         save_json(p_plan(target), plan)
@@ -722,7 +722,7 @@ def refresh_plan(target, results, client, dry, final=False):
 
 
 def append_needs(plan, new_needs, target, dry):
-    """把使用者補充的需求追加到已有計畫（只追加，不動既有項），排在現有時段之後。"""
+    """把用户补充的需求追加到已有计划（只追加，不动既有项），排在现有时段之后。"""
     have = {i["id"] for i in plan["items"]}
     add = [{"id": n["id"], "ref": "REQ", "title": n["title"], "est_hours": n["est_hours"], "done_std": "",
             "subtasks": [], "from_requirement": True} for n in new_needs if n["id"] not in have]
@@ -737,7 +737,7 @@ def append_needs(plan, new_needs, target, dry):
 
 
 def ingest_requirements(client, target, dry):
-    """讀取使用者對「需求不足」卡片的回覆，每行一條需求，記入 .supervisor/needs.json。返回新增條目。"""
+    """读取用户对“需求不足”卡片的回复，每行一条需求，记入 .supervisor/needs.json。返回新增条目。"""
     asks = load_json(p_asks(), {})
     needs = load_json(p_needs(), {"items": [], "ingested": []})
     new = []
@@ -754,12 +754,12 @@ def ingest_requirements(client, target, dry):
     if new and not dry:
         save_json(p_needs(), needs)
     elif new:
-        print("[dry-run] 讀到 %d 條補充需求：%s" % (len(new), [n["title"] for n in new]))
+        print("[dry-run] 读到 %d 条补充需求：%s" % (len(new), [n["title"] for n in new]))
     return new
 
 
 def maybe_ask(client, plan, target, dry, final=False):
-    """target 日的計畫工時低於下限就在 Lark 主動要需求（有次數與間隔限制）。返回是否發了卡片。"""
+    """target 日的计划工时低于下限就在 Lark 主动要需求（有次数与间隔限制）。返回是否发了卡片。"""
     minh = min_plan_hours()
     total = plan_total_hours(plan)
     if total >= minh:
@@ -771,16 +771,16 @@ def maybe_ask(client, plan, target, dry, final=False):
         return False
     items = (plan or {}).get("items", [])
     rows = [(i.get("slot") or "待排", i["title"], "%gh" % float(i.get("est_hours", 1))) for i in items]
-    md = ("**%s 目前只排了 %d 項、約 %.2fh，低於下限 %.1fh。**\n\n%s\n\n"
-          "**怎麼補**（任選一種）\n"
-          "1. **對本卡片點「回覆」**，每行寫一條需求，行內可寫「2h」表示估時，不寫默認 1h\n"
-          "2. 在 `tasks/` 新增任務卡（寫上 `est_hours`）\n"
-          "3. 讓 agent 寫 `plans/%s.json`") % (
+    md = ("**%s 目前只排了 %d 项、约 %.2fh，低于下限 %.1fh。**\n\n%s\n\n"
+          "**怎么补**（任选一种）\n"
+          "1. **对本卡片点“回复”**，每行写一条需求，行内可写“2h”表示估时，不写默认 1h\n"
+          "2. 在 `tasks/` 新增任务卡（写上 `est_hours`）\n"
+          "3. 让 agent 写 `plans/%s.json`") % (
         target, len(items), total, minh,
-        md_table(rows, ["時段", "已排", "估時"]) if rows else "（目前沒有任何已排項）", target)
+        md_table(rows, ["时段", "已排", "估时"]) if rows else "（目前没有任何已排项）", target)
     mid = client.card("%s需求不足" % ("今日" if target == dt.date.today().isoformat() else "明日"),
                       "red" if total == 0 else "orange", md, subtitle=target,
-                      footer="監工 · 你的回覆會被讀取並併入計畫；沒有需求就沒有任務可排")
+                      footer="监工 · 你的回复会被读取并并入计划；没有需求就没有任务可排")
     entry["mids"].append(mid)
     entry["count"] = entry.get("count", 0) + 1
     entry["last"] = now.isoformat(timespec="seconds")
@@ -792,7 +792,7 @@ def maybe_ask(client, plan, target, dry, final=False):
 
 
 def sync_progress(day, res, dry):
-    """把 day 的 Lark 進度寫進 .supervisor/progress.json（看板與任務卡同步的依據）。"""
+    """把 day 的 Lark 进度写进 .supervisor/progress.json（看板与任务卡同步的依据）。"""
     q = load_json(p_state_q(day), {}) or {}
     items = []
     for r in res:
@@ -807,14 +807,14 @@ def sync_progress(day, res, dry):
     prog = load_json(p_progress(), {"days": {}})
     prog["days"][day] = entry
     if dry:
-        print("[dry-run] 進度 %s：主任務 %d/%d，子任務 %d/%d" % (day, done, m, sd, st))
+        print("[dry-run] 进度 %s：主任务 %d/%d，子任务 %d/%d" % (day, done, m, sd, st))
     else:
         save_json(p_progress(), prog)
     return prog
 
 
 def backfill_progress(client, dry, skip_day=None):
-    """把有任務狀態檔、但還沒進度記錄的歷史日補進 progress.json（首次啟用或漏跑時）。"""
+    """把有任务状态文件、但还没进度记录的历史日补进 progress.json（首次启用或漏跑时）。"""
     prog = load_json(p_progress(), {"days": {}})
     for path in sorted(glob.glob(os.path.join(SUP, "tasks-*.json"))):
         m = re.match(r"tasks-(\d{4})(\d{2})(\d{2})\.json$", os.path.basename(path))
@@ -829,7 +829,7 @@ def backfill_progress(client, dry, skip_day=None):
 
 
 def sync_task_cards(prog, dry):
-    """依 progress.json 回寫 tasks/*.md 的 status 與 progress（按 front matter 的 id 對應 ref）。"""
+    """依 progress.json 回写 tasks/*.md 的 status 与 progress（按 front matter 的 id 对应 ref）。"""
     agg = {}
     for d in sorted(prog["days"]):
         for it in prog["days"][d]["items"]:
@@ -857,7 +857,7 @@ def sync_task_cards(prog, dry):
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(new)
     if changed:
-        print("同步任務卡：" + "；".join(changed))
+        print("同步任务卡：" + "；".join(changed))
     return changed
 
 
@@ -868,11 +868,11 @@ def refresh_dashboard(dry):
         subprocess.run([sys.executable, "-X", "utf8", "-I", os.path.join(ROOT, "scripts", "build_dashboard.py")],
                        capture_output=True, timeout=60, cwd=ROOT)
     except Exception:
-        pass  # 看板刷新失敗不能拖垮監工
+        pass  # 看板刷新失败不能拖垮监工
 
 
 def post_run(day, client, dry, res, phase):
-    """每個命令收尾：進度寫回本地 → 任務卡同步 → 讀補充需求 → 維護次日計畫 → 需求不足就要 → 刷新看板。"""
+    """每个命令收尾：进度写回本地 → 任务卡同步 → 读补充需求 → 维护次日计划 → 需求不足就要 → 刷新看板。"""
     state = load_json(p_state_tasks(day), [])
     if res is None and state:
         res = collect_results(state, client)
@@ -894,7 +894,7 @@ def post_run(day, client, dry, res, phase):
 
 
 def carry_and_plan(day, client, dry, write_plan=True):
-    """收集 day 的最終結果，順延並生成（定稿）次日計畫。返回 (results, plan, wrote)。"""
+    """收集 day 的最终结果，顺延并生成（定稿）次日计划。返回 (results, plan, wrote)。"""
     state = load_json(p_state_tasks(day), [])
     res = collect_results(state, client)
     nxt = next_day(day)
@@ -904,7 +904,7 @@ def carry_and_plan(day, client, dry, write_plan=True):
         plan = build_next_plan(res, read_backlog(), nxt)
         return res, plan, False
     if existing is not None and existing.get("generated_by") != "supervisor":
-        print("plans/%s.json 是別人寫的，不覆蓋（請 agent 自行併入順延項）" % nxt)
+        print("plans/%s.json 是别人写的，不覆盖（请 agent 自行并入顺延项）" % nxt)
         plan = build_next_plan(res, read_backlog(), nxt)
         return res, plan, False
     plan = refresh_plan(nxt, res, client, dry, final=True)
@@ -914,12 +914,12 @@ def carry_and_plan(day, client, dry, write_plan=True):
 def cmd_close(day, client, dry):
     rollover = "%s-2400-supervisor-rollover.md" % compact(day)
     if os.path.exists(os.path.join(WORKLOG, rollover)) and not dry:
-        print("已收尾過 %s，略過" % day)
+        print("已收尾过 %s，略过" % day)
         return
     state = load_json(p_state_tasks(day))
     if state is None:
         write_worklog("%s-2400-supervisor-error.md" % compact(day),
-                      "# %s 無法收尾\n\n昨日沒有任務狀態檔（未建立任務或監工未運行），無法判定旷工。\n" % day, dry)
+                      "# %s 无法收尾\n\n昨日没有任务状态文件（未建立任务或监工未运行），无法判定旷工。\n" % day, dry)
         return
     res, plan, wrote = carry_and_plan(day, client, dry)
     q = load_json(p_state_q(day), {"question_ids": []})
@@ -928,35 +928,35 @@ def cmd_close(day, client, dry):
         user_replies += sum(1 for r in client.replies(mid) if r.get("sender_type") == "user")
     absent = decide_absent(res, user_replies)
     done, m, sd, st = progress_summary(res)
-    lines = ["# %s 收尾（監工自動生成）" % day, "",
-             "- 完成度：主任務 %d/%d，子任務 %d/%d" % (done, m, sd, st),
-             "- 旷工：%s" % ("是（無完成、無評論、無回覆）" if absent else "否"), "", "## 順延清單", ""]
+    lines = ["# %s 收尾（监工自动生成）" % day, "",
+             "- 完成度：主任务 %d/%d，子任务 %d/%d" % (done, m, sd, st),
+             "- 旷工：%s" % ("是（无完成、无评论、无回复）" if absent else "否"), "", "## 顺延清单", ""]
     carried = [i for i in plan["items"] if i.get("carried")]
     for c in carried:
-        lines.append("- %s %s（原因：%s）" % (c.get("ref", ""), c["title"], c.get("carry_reason") or "未說明"))
+        lines.append("- %s %s（原因：%s）" % (c.get("ref", ""), c["title"], c.get("carry_reason") or "未说明"))
     if not carried:
-        lines.append("- 無")
-    lines += ["", "## 次日計畫 plans/%s.json" % plan["date"], "",
-              "- 總工時約 %sh；未排入：%s" % (plan["total_hours"], "、".join(plan["deferred"]) or "無"),
-              "- 檔案%s" % ("已寫入" if wrote else "未寫入（已存在或 dry-run）")]
+        lines.append("- 无")
+    lines += ["", "## 次日计划 plans/%s.json" % plan["date"], "",
+              "- 总工时约 %sh；未排入：%s" % (plan["total_hours"], "、".join(plan["deferred"]) or "无"),
+              "- 文件%s" % ("已写入" if wrote else "未写入（已存在或 dry-run）")]
     write_worklog(rollover, "\n".join(lines) + "\n", dry)
     if absent:
         write_worklog("%s-2400-supervisor-absent.md" % compact(day),
-                      "# 旷工（未回報）\n\n- 日期：%s\n- 判定：無任一主任務完成、無使用者評論、對提問無回覆\n"
-                      "- 提問與催促次數：%d\n- 說明：僅代表未回應；若次數少於 7，可能因電腦休眠導致追問不足，可信度較低\n"
+                      "# 旷工（未回报）\n\n- 日期：%s\n- 判定：无任一主任务完成、无用户评论、对提问无回复\n"
+                      "- 提问与催促次数：%d\n- 说明：仅代表未回应；若次数少于 7，可能因电脑休眠导致追问不足，可信度较低\n"
                       % (day, len(q.get("question_ids", []))), dry)
     color = "red" if absent else ("green" if done == m else "orange")
-    rows = [(c.get("ref", ""), c["title"], c.get("carry_reason") or "未說明") for c in carried[:8]]
-    md = "**完成度**：主任務 %d/%d · 子任務 %d/%d\n**旷工**：%s\n\n%s" % (
+    rows = [(c.get("ref", ""), c["title"], c.get("carry_reason") or "未说明") for c in carried[:8]]
+    md = "**完成度**：主任务 %d/%d · 子任务 %d/%d\n**旷工**：%s\n\n%s" % (
         done, m, sd, st, "是" if absent else "否",
-        md_table(rows, ["編號", "順延項", "原因"]) if rows else "全部完成，無順延。")
-    client.card("昨日收尾", color, md, subtitle=day, footer="監工 · 08:30 將按順延後的計畫建立今日任務")
-    notify("昨日收尾：完成 %d/%d，順延 %d 項%s" % (done, m, len(carried), "，旷工" if absent else ""), dry)
+        md_table(rows, ["编号", "顺延项", "原因"]) if rows else "全部完成，无顺延。")
+    client.card("昨日收尾", color, md, subtitle=day, footer="监工 · 08:30 将按顺延后的计划建立今日任务")
+    notify("昨日收尾：完成 %d/%d，顺延 %d 项%s" % (done, m, len(carried), "，旷工" if absent else ""), dry)
     post_run(day, client, dry, res, "close")
 
 
 def cmd_sync(day, client, dry):
-    """白天同步：不發進度卡片，只更新本地進度、維護次日計畫草案、需求不足才要需求、刷新看板。"""
+    """白天同步：不发进度卡片，只更新本地进度、维护次日计划草案、需求不足才要需求、刷新看板。"""
     state = load_json(p_state_tasks(day), [])
     res = collect_results(state, client) if state else None
     post_run(day, client, dry, res, "sync")
@@ -965,19 +965,19 @@ def cmd_sync(day, client, dry):
 def cmd_status(day):
     state = load_json(p_state_tasks(day), [])
     q = load_json(p_state_q(day), None)
-    print("日期 %s｜任務 %d 項｜提問狀態 %s" % (day, len(state), q))
+    print("日期 %s｜任务 %d 项｜提问状态 %s" % (day, len(state), q))
     for e in state:
-        print("  %s %s（子任務 %d）" % (e.get("slot"), e["summary"], len(e.get("subtasks", []))))
-    print("計畫檔 plans/%s.json：%s" % (day, "存在" if os.path.exists(p_plan(day)) else "不存在"))
+        print("  %s %s（子任务 %d）" % (e.get("slot"), e["summary"], len(e.get("subtasks", []))))
+    print("计划文件 plans/%s.json：%s" % (day, "存在" if os.path.exists(p_plan(day)) else "不存在"))
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="work-boss 監工執行器")
+    ap = argparse.ArgumentParser(description="work-boss 监工执行器")
     ap.add_argument("cmd", choices=["morning", "evening", "chase", "close", "sync", "plan-carry", "status"])
-    ap.add_argument("--date", help="YYYY-MM-DD；morning/evening/chase/sync/status 默認今日，close/plan-carry 默認昨日")
+    ap.add_argument("--date", help="YYYY-MM-DD；morning/evening/chase/sync/status 默认今日，close/plan-carry 默认昨日")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-notify", action="store_true")
-    ap.add_argument("--force", action="store_true", help="morning：即使無新增也重發卡片")
+    ap.add_argument("--force", action="store_true", help="morning：即使无新增也重发卡片")
     a = ap.parse_args(argv)
     if a.no_notify:
         os.environ["WORK_BOSS_NO_NOTIFY"] = "1"
@@ -1005,14 +1005,14 @@ def main(argv=None):
             cmd_sync(day, client, a.dry_run)
         elif a.cmd == "plan-carry":
             carry_and_plan(day, client, a.dry_run)
-    except Exception as e:  # 失敗要留痕並盡力通知，不能靜默
-        msg = "%s %s 失敗：%s" % (day, a.cmd, str(e)[:300])
+    except Exception as e:  # 失败要留痕并尽力通知，不能静默
+        msg = "%s %s 失败：%s" % (day, a.cmd, str(e)[:300])
         print(msg, file=sys.stderr)
         if not a.dry_run:
             write_worklog("%s-%s-supervisor-error.md" % (compact(day), dt.datetime.now().strftime("%H%M")),
-                          "# 監工執行失敗\n\n- 命令：%s\n- 錯誤：%s\n" % (a.cmd, str(e)[:500]), False)
+                          "# 监工执行失败\n\n- 命令：%s\n- 错误：%s\n" % (a.cmd, str(e)[:500]), False)
             try:
-                LarkCLI().card("監工執行失敗", "red", "**%s**\n錯誤已寫入 worklog。" % a.cmd, subtitle=day)
+                LarkCLI().card("监工执行失败", "red", "**%s**\n错误已写入 worklog。" % a.cmd, subtitle=day)
             except Exception:
                 pass
         return 1

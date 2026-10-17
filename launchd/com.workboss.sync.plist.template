@@ -9,7 +9,7 @@
     <string>__ROOT__/scripts/supervisor.py</string><string>sync</string>
   </array>
   <key>WorkingDirectory</key><string>__ROOT__</string>
-  <!-- 白天每小時同步一次：10:05 到 19:05，避開整點與早晚主流程 -->
+  <!-- 白天每小时同步一次：10:05 到 19:05，避开整点与早晚主流程 -->
   <key>StartCalendarInterval</key>
   <array>
     <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>5</integer></dict>

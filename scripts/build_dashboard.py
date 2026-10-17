@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""掃描 tasks/ 與 worklog/，生成自包含的 docs/dashboard.html（離線可開，無外部依賴）。
+"""扫描 tasks/ 与 worklog/，生成自包含的 docs/dashboard.html（离线可开，无外部依赖）。
 
 用法：python3 scripts/build_dashboard.py
-資料每次生成時嵌入頁面；要看最新狀態，重新執行本腳本後刷新頁面。
+数据每次生成时嵌入页面；要看最新状态，重新执行本脚本后刷新页面。
 """
 import datetime
 import json
@@ -120,7 +120,7 @@ def main():
     out = os.path.join(ROOT, "docs", "dashboard.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
-    print("已生成", out, "任務卡 %d 張，日誌 %d 份，進度 %d 天，計畫 %d 份" % (
+    print("已生成", out, "任务卡 %d 张，日志 %d 份，进度 %d 天，计划 %d 份" % (
         len(data["tasks"]), len(data["logs"]), len(data["progress"]), len(data["plans"])))
 
 

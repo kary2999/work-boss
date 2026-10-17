@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""監工群收發工具。只用 REST；密鑰運行時從 config/lark.json 指向的 env 檔讀取，不輸出、不落盤。
+"""监工群收发工具。只用 REST；密钥运行时从 config/lark.json 指向的 env 文件读取，不输出、不落盘。
 
 用法:
-  lark_ops.py send "文字"                 發到監工群，輸出 message_id
-  lark_ops.py reply <message_id> "文字"   回覆指定消息（reply_in_thread）
-  lark_ops.py chats                       列出機器人所在的群（找 chat_id 用）
-  lark_ops.py poll [N]                    讀取群裡最近 N 條（默認 20），輸出 JSON 行
-  lark_ops.py replies <message_id>        列出直接回覆指定消息的消息（按 parent_id / root_id 判斷）
+  lark_ops.py send "文字"                 发到监工群，输出 message_id
+  lark_ops.py reply <message_id> "文字"   回复指定消息（reply_in_thread）
+  lark_ops.py chats                       列出机器人所在的群（找 chat_id 用）
+  lark_ops.py poll [N]                    读取群里最近 N 条（默认 20），输出 JSON 行
+  lark_ops.py replies <message_id>        列出直接回复指定消息的消息（按 parent_id / root_id 判断）
   lark_ops.py card --title T [--subtitle S] [--template blue|green|orange|red|grey] --md "markdown"
-                   [--footer "小字"] [--button "文字|https://網址"]...   發互動卡片（不產生回調）
-  lark_ops.py subtask-create <parent_guid> --summary S [--desc D] [--due "YYYY-MM-DD HH:MM"] [--no-assignee]   建子任務
-  lark_ops.py attach <guid> <檔案>...     把本地檔案（如參考截圖）作為附件上傳到任務
-  lark_ops.py task-attachments <guid>...  列出任務的附件
-  lark_ops.py task-delete <guid>          刪除任務（僅用於清理測試任務）
-  lark_ops.py task-update <guid> [--summary S] [--desc D] [--start "…"] [--due "…"]   改標題／描述／起止時間（含子任務）
-  lark_ops.py task-comments <guid>...     讀任務評論（使用者在任務裡寫的未完成原因）
+                   [--footer "小字"] [--button "文字|https://网址"]...   发互动卡片（不产生回调）
+  lark_ops.py subtask-create <parent_guid> --summary S [--desc D] [--due "YYYY-MM-DD HH:MM"] [--no-assignee]   建子任务
+  lark_ops.py attach <guid> <文件>...     把本地文件（如参考截图）作为附件上传到任务
+  lark_ops.py task-attachments <guid>...  列出任务的附件
+  lark_ops.py task-delete <guid>          删除任务（仅用于清理测试任务）
+  lark_ops.py task-update <guid> [--summary S] [--desc D] [--start "…"] [--due "…"]   改标题／描述／起止时间（含子任务）
+  lark_ops.py task-comments <guid>...     读任务评论（用户在任务里写的未完成原因）
   lark_ops.py task-create --summary S [--desc D] [--start "YYYY-MM-DD HH:MM"] [--due "YYYY-MM-DD HH:MM"|YYYY-MM-DD] [--assignee ou_xxx]
-                                          建 Lark 任務（默認負責人取 config 的 owner_open_id）
-  lark_ops.py task-get <guid>...          查任務是否已完成（輪詢，不需要回調）
+                                          建 Lark 任务（默认负责人取 config 的 owner_open_id）
+  lark_ops.py task-get <guid>...          查任务是否已完成（轮询，不需要回调）
 """
 import json
 import os
@@ -29,7 +29,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CFG_PATH = os.environ.get("WORK_BOSS_CONFIG", os.path.join(ROOT, "config", "lark.json"))
 if not os.path.exists(CFG_PATH):
-    sys.exit("找不到配置檔 %s；請複製 config/lark.example.json 為 config/lark.json 並填寫" % CFG_PATH)
+    sys.exit("找不到配置文件 %s；请复制 config/lark.example.json 为 config/lark.json 并填写" % CFG_PATH)
 CFG = json.load(open(CFG_PATH, encoding="utf-8"))
 
 
@@ -69,7 +69,7 @@ def token():
     r = call("POST", "/open-apis/auth/v3/tenant_access_token/internal",
              {"app_id": ENV[CFG["app_id_key"]], "app_secret": ENV[CFG["app_secret_key"]]})
     if r.get("code") != 0:
-        sys.exit("token 失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+        sys.exit("token 失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
     return r["tenant_access_token"]
 
 
@@ -85,7 +85,7 @@ def fetch(t, n):
     r = call("GET", "/open-apis/im/v1/messages?container_id_type=chat&container_id=%s&sort_type=ByCreateTimeDesc&page_size=%d"
              % (CFG["chat_id"], min(max(n, 1), 50)), token=t)
     if r.get("code") != 0:
-        sys.exit("讀取失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+        sys.exit("读取失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
     return (r.get("data") or {}).get("items") or []
 
 
@@ -98,13 +98,13 @@ def brief(m):
 
 
 def upload_attachments(guid, paths, token):
-    """把本地檔案作為附件上傳到 Lark 任務（multipart/form-data）。返回每個檔案的結果。"""
+    """把本地文件作为附件上传到 Lark 任务（multipart/form-data）。返回每个文件的结果。"""
     import mimetypes
     import uuid
     out = []
     for p in paths:
         if not os.path.isfile(p):
-            out.append({"file": p, "error": "檔案不存在"})
+            out.append({"file": p, "error": "文件不存在"})
             continue
         boundary = "----workboss" + uuid.uuid4().hex
         data = open(p, "rb").read()
@@ -137,7 +137,7 @@ def upload_attachments(guid, paths, token):
 
 
 def build_card(title, template, md, footer=None, buttons=None, subtitle=None):
-    """卡片 JSON 2.0，只含展示元素與 open_url 按鈕（不產生回調，不需要事件訂閱）。"""
+    """卡片 JSON 2.0，只含展示元素与 open_url 按钮（不产生回调，不需要事件订阅）。"""
     header = {"title": {"tag": "plain_text", "content": title}, "template": template}
     if subtitle:
         header["subtitle"] = {"tag": "plain_text", "content": subtitle}
@@ -152,7 +152,7 @@ def build_card(title, template, md, footer=None, buttons=None, subtitle=None):
 
 
 def opt(args, name, default=None):
-    """取 --name 後面的值；可重複的選項用 optall。"""
+    """取 --name 后面的值；可重复的选项用 optall。"""
     if name in args:
         i = args.index(name)
         if i + 1 < len(args):
@@ -173,13 +173,13 @@ def main():
         def unesc(s):
             return s.replace("\\n", "\n") if s else s
 
-        card = build_card(opt(a, "--title", "監工"), opt(a, "--template", "orange"), unesc(opt(a, "--md", "")),
+        card = build_card(opt(a, "--title", "监工"), opt(a, "--template", "orange"), unesc(opt(a, "--md", "")),
                           unesc(opt(a, "--footer")), [tuple(b.split("|", 1)) for b in optall(a, "--button") if "|" in b],
                           opt(a, "--subtitle"))
         r = call("POST", "/open-apis/im/v1/messages?receive_id_type=chat_id",
                  {"receive_id": CFG["chat_id"], "msg_type": "interactive", "content": json.dumps(card, ensure_ascii=False)}, t)
         if r.get("code") != 0:
-            sys.exit("發卡片失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("发卡片失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         print(json.dumps({"message_id": r["data"]["message_id"]}))
         return
     if a[0] == "task-create":
@@ -204,7 +204,7 @@ def main():
             body["members"] = [{"id": who, "type": "user", "role": "assignee"}]
         r = call("POST", "/open-apis/task/v2/tasks?user_id_type=open_id", body, t)
         if r.get("code") != 0:
-            sys.exit("建任務失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("建任务失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         tk = r["data"]["task"]
         print(json.dumps({"guid": tk.get("guid"), "url": tk.get("url")}, ensure_ascii=False))
         return
@@ -229,7 +229,7 @@ def main():
     if a[0] == "chats":
         r = call("GET", "/open-apis/im/v1/chats?page_size=50", token=t)
         if r.get("code") != 0:
-            sys.exit("列群失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("列群失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         for c in (r.get("data") or {}).get("items") or []:
             print(json.dumps({"name": c.get("name"), "chat_id": c.get("chat_id")}, ensure_ascii=False))
         return
@@ -253,7 +253,7 @@ def main():
         r = call("PATCH", "/open-apis/task/v2/tasks/%s?user_id_type=open_id" % a[1],
                  {"task": task, "update_fields": fields}, t)
         if r.get("code") != 0:
-            sys.exit("改任務失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("改任务失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         print(json.dumps({"guid": a[1], "updated": fields}))
         return
     if a[0] == "subtask-create" and len(a) >= 3:
@@ -269,7 +269,7 @@ def main():
             body["members"] = [{"id": who, "type": "user", "role": "assignee"}]
         r = call("POST", "/open-apis/task/v2/tasks/%s/subtasks?user_id_type=open_id" % a[1], body, t)
         if r.get("code") != 0:
-            sys.exit("建子任務失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("建子任务失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         sub = r["data"]["subtask"]
         print(json.dumps({"guid": sub.get("guid"), "url": sub.get("url")}, ensure_ascii=False))
         return
@@ -300,8 +300,9 @@ def main():
                 return {"guid": g, "error": "code=%s msg=%s" % (r.get("code"), r.get("msg"))}
             tk = r["data"]["task"]
             done = tk.get("completed_at") not in (None, "", "0", 0)
-            return {"guid": g, "summary": tk.get("summary"), "completed": done, "completed_at": tk.get("completed_at")}
-        with ThreadPoolExecutor(max_workers=8) as ex:  # 並行讀取，保持輸出順序與輸入一致
+            return {"guid": g, "summary": tk.get("summary"), "completed": done, "completed_at": tk.get("completed_at"),
+                    "description": tk.get("description", "")}
+        with ThreadPoolExecutor(max_workers=8) as ex:  # 并行读取，保持输出顺序与输入一致
             for row in ex.map(one_get, a[1:]):
                 print(json.dumps(row, ensure_ascii=False))
         return
@@ -309,13 +310,13 @@ def main():
         r = call("POST", "/open-apis/im/v1/messages?receive_id_type=chat_id",
                  {"receive_id": CFG["chat_id"], "msg_type": "text", "content": json.dumps({"text": a[1]}, ensure_ascii=False)}, t)
         if r.get("code") != 0:
-            sys.exit("發送失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("发送失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         print(json.dumps({"message_id": r["data"]["message_id"]}))
     elif a[0] == "reply" and len(a) >= 3:
         r = call("POST", "/open-apis/im/v1/messages/%s/reply" % a[1],
                  {"msg_type": "text", "content": json.dumps({"text": a[2]}, ensure_ascii=False), "reply_in_thread": True}, t)
         if r.get("code") != 0:
-            sys.exit("回覆失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
+            sys.exit("回复失败: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         print(json.dumps({"message_id": r["data"]["message_id"]}))
     elif a[0] == "poll":
         for m in reversed(fetch(t, int(a[1]) if len(a) > 1 else 20)):

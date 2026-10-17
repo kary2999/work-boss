@@ -1,4 +1,4 @@
-# ---- 私有資料：絕不入庫 ----
+# ---- 私有数据：绝不入库 ----
 worklog/*
 !worklog/_TEMPLATE.md
 .supervisor/
@@ -10,7 +10,7 @@ plans/*
 PROJECT.md
 notes/
 
-# ---- 示範專案的產出（不是監工系統本身）----
+# ---- 示范项目的产出（不是监工系统本身）----
 docs/dashboard.html
 docs/axure-master-library-plan.html
 docs/three-day-plan.html
@@ -21,10 +21,10 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# 第三方網站（UEEX）參考截圖：僅本地對照用，不入庫
+# 第三方网站（UEEX）参考截图：仅本地对照用，不入库
 docs/assets/ueex-ref/
 docs/contract-page-breakdown.html
 
-# 使用者提供的參考截圖（登入後頁面等）：私有，不入庫
+# 用户提供的参考截图（登录后页面等）：私有，不入库
 参考图组/
 docs/contract-app-breakdown.html

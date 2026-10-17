@@ -1,87 +1,87 @@
-<!-- [skill: go-team-standards · 文档场景] work-boss 安裝與 macOS 排程配置 -->
-# 安裝與 macOS 排程
+<!-- [skill: go-team-standards · 文档场景] work-boss 安装与 macOS 定时任务配置 -->
+# 安装与 macOS 定时任务
 
-## 1. 前置條件
+## 1. 前置条件
 
-| 項目 | 說明 |
+| 项目 | 说明 |
 |---|---|
-| macOS | 使用 launchd（用戶級，不需要 sudo） |
-| Python 3 | 只用標準庫，3.9 即可；`/usr/bin/python3` 可用 |
-| Lark／飛書自建應用 | 啟用**機器人**能力，並已把機器人加進「監工群」 |
-| 應用權限 | 見下表；開通後要**創建版本並發布**才生效 |
-| 密鑰檔 | 一個倉庫之外的 env 檔，含 app id／secret／domain 三個鍵 |
+| macOS | 使用 launchd（用户级，不需要 sudo） |
+| Python 3 | 只用标准库，3.9 即可；`/usr/bin/python3` 可用 |
+| Lark／飞书自建应用 | 启用**机器人**能力，并已把机器人加进“监工群” |
+| 应用权限 | 见下表；开通后要**创建版本并发布**才生效 |
+| 密钥文件 | 一个仓库之外的 env 文件，含 app id／secret／domain 三个键 |
 
-### 應用權限（實際遇到過的報錯與對應）
+### 应用权限（实际遇到过的报错与对应）
 
-| 能力 | 報錯時的線索 | 需要的權限 |
+| 能力 | 报错时的线索 | 需要的权限 |
 |---|---|---|
-| 讀取群列表 | `99991672 … im:chat` | `im:chat:readonly` 或 `im:chat` |
-| 讀取群消息（判斷回覆） | `230027 need scope: im:message.group_msg` | `im:message.group_msg`（以及 `im:message` 或 `im:message:readonly`） |
-| 以機器人發消息／卡片 | — | `im:message:send_as_bot` |
-| 建任務、子任務、改任務、讀狀態與評論 | — | 任務讀寫權限（task v2；未逐一核對權限名，缺權限時 API 會在 `msg` 裡寫明需要的 scope） |
+| 读取群列表 | `99991672 … im:chat` | `im:chat:readonly` 或 `im:chat` |
+| 读取群消息（判断回复） | `230027 need scope: im:message.group_msg` | `im:message.group_msg`（以及 `im:message` 或 `im:message:readonly`） |
+| 以机器人发消息／卡片 | — | `im:message:send_as_bot` |
+| 建任务、子任务、改任务、读状态与评论 | — | 任务读写权限（task v2；未逐一核对权限名，缺权限时 API 会在 `msg` 里写明需要的 scope） |
 
-> 與其他系統共用同一個機器人時：**不要**為本系統開第二條長連接或改事件訂閱，本系統只用 REST。
+> 与其他系统共用同一个机器人时：**不要**为本系统开第二条长连接或改事件订阅，本系统只用 REST。
 
 ## 2. 配置
 
 ```bash
 cp config/lark.example.json config/lark.json
-# 編輯 config/lark.json：chat_id、owner_open_id、env_file
-python3 scripts/lark_ops.py chats        # 列出機器人所在的群，找到 chat_id
+# 编辑 config/lark.json：chat_id、owner_open_id、env_file
+python3 scripts/lark_ops.py chats        # 列出机器人所在的群，找到 chat_id
 ```
 
-- `owner_open_id`：負責人（你）的 open_id。可從你在群裡發的消息的 `sender_id` 取得：`python3 scripts/lark_ops.py poll 10`。
-- `env_file` 指向的檔案至少要有 `config/lark.json` 裡 `app_id_key`／`app_secret_key`／`domain_key` 指定的三個鍵。domain 值含 `lark` 走 `open.larksuite.com`，否則走 `open.feishu.cn`。
+- `owner_open_id`：负责人（你）的 open_id。可从你在群里发的消息的 `sender_id` 取得：`python3 scripts/lark_ops.py poll 10`。
+- `env_file` 指向的文件至少要有 `config/lark.json` 里 `app_id_key`／`app_secret_key`／`domain_key` 指定的三个键。domain 值含 `lark` 走 `open.larksuite.com`，否则走 `open.feishu.cn`。
 - `config/lark.json` 已被 `.gitignore` 排除，不要提交。
 
-## 3. 先乾跑
+## 3. 先试运行
 
 ```bash
-python3 -m unittest discover -s tests                  # 單元測試
-python3 scripts/supervisor.py status                    # 本地狀態
-python3 scripts/supervisor.py morning --dry-run         # 只印出將建立的任務與卡片，不寫入
+python3 -m unittest discover -s tests                  # 单元测试
+python3 scripts/supervisor.py status                    # 本地状态
+python3 scripts/supervisor.py morning --dry-run         # 只印出将建立的任务与卡片，不写入
 ```
 
-`--dry-run` 的讀取類呼叫（任務狀態、評論、回覆）照常執行，寫入類（建任務、發卡片、寫日誌、寫狀態）只印出。
+`--dry-run` 的读取类调用（任务状态、评论、回复）照常执行，写入类（建任务、发卡片、写日志、写状态）只印出。
 
-## 4. 安裝 launchd
+## 4. 安装 launchd
 
 ```bash
-bash scripts/install_launchd.sh            # 安裝 morning / evening / chase / close / sync
-launchctl list | grep workboss             # 確認已載入
-bash scripts/install_launchd.sh --uninstall   # 卸載
+bash scripts/install_launchd.sh            # 安装 morning / evening / chase / close / sync
+launchctl list | grep workboss             # 确认已载入
+bash scripts/install_launchd.sh --uninstall   # 卸载
 ```
 
-| Label | 觸發 |
+| Label | 触发 |
 |---|---|
 | `com.workboss.morning` | 每天 08:30 |
 | `com.workboss.evening` | 每天 20:30 |
 | `com.workboss.chase` | 每天 21:00、21:30、22:00、22:30、23:00、23:30 |
 | `com.workboss.close` | 每天 00:00（收尾昨日） |
-| `com.workboss.sync` | 每天 10:05 到 19:05，每小時一次（同步進度、維護次日計畫、刷新看板） |
+| `com.workboss.sync` | 每天 10:05 到 19:05，每小时一次（同步进度、维护次日计划、刷新看板） |
 
-可選配置（`config/lark.json`）：`"min_plan_hours": 4`——當日計畫低於這個工時就在 Lark 主動要需求，缺省 4。也可用環境變數 `WORK_BOSS_MIN_HOURS` 臨時覆蓋。
+可选配置（`config/lark.json`）：`"min_plan_hours": 4`——当日计划低于这个工时就在 Lark 主动要需求，缺省 4。也可用环境变量 `WORK_BOSS_MIN_HOURS` 临时覆盖。
 
-日誌在 `.supervisor/logs/*.log`。Mac 睡眠時錯過的觸發會在喚醒後補跑。
+日志在 `.supervisor/logs/*.log`。Mac 睡眠时错过的触发会在唤醒后补跑。
 
-### 重要：外接卷與隱私權限
+### 重要：外接卷与隐私权限
 
-安裝腳本會先做自測。**若倉庫放在外接卷（如 `/Volumes/...`），launchd 背景環境通常讀不到**，表現為 `Operation not permitted`，安裝會被攔下。解決辦法二選一：
+安装脚本会先做自测。**若仓库放在外接卷（如 `/Volumes/...`），launchd 背景环境通常读不到**，表现为 `Operation not permitted`，安装会被拦下。解决办法二选一：
 
-- **A（推薦）**：把倉庫放到家目錄，例如 `~/Code/work-boss`，再安裝。launchd 能讀家目錄（`Desktop`／`Documents`／`Downloads` 另有隱私保護，也別放那裡）。
-- **B**：系統設定 → 隱私與安全性 → 完全磁碟存取權限 → 加入 Python（真實二進制通常在 `/Library/Developer/CommandLineTools/usr/bin/python3`），重新運行安裝腳本。
+- **A（推荐）**：把仓库放到家目录，例如 `~/Code/work-boss`，再安装。launchd 能读家目录（`Desktop`／`Documents`／`Downloads` 另有隐私保护，也别放那里）。
+- **B**：系统设置 → 隐私与安全性 → 完全磁盘访问权限 → 加入 Python（真实二进制通常在 `/Library/Developer/CommandLineTools/usr/bin/python3`），重新运行安装脚本。
 
-> 這是在實際環境裡驗證過的現象：同一個 launchd 任務可以讀家目錄，讀外接卷被拒。
+> 这是在实际环境里验证过的现象：同一个 launchd 任务可以读家目录，读外接卷被拒。
 
-## 5. 只啟用一種排程
+## 5. 只启用一种定时方式
 
-`evening` 與 `chase` 不是冪等的。若同時啟用 launchd 與其他排程（例如某個 AI 客戶端的定時任務）去呼叫同一個腳本，群裡會收到重複卡片。安裝 launchd 後，請停用其他排程。
+`evening` 与 `chase` 不是幂等的。若同时启用 launchd 与其他定时任务（例如某个 AI 客户端的定时任务）去调用同一个脚本，群里会收到重复卡片。安装 launchd 后，请停用其他定时任务。
 
-## 6. 補產出與手動操作
+## 6. 补产出与手动操作
 
 ```bash
-python3 scripts/supervisor.py sync                          # 立刻同步：進度→本地、任務卡、次日計畫、看板（約 15～40 秒；首次會回填歷史日，較久）
-python3 scripts/supervisor.py plan-carry --date 2026-10-15    # 只生成「順延＋次日計畫」，不發消息
+python3 scripts/supervisor.py sync                          # 立刻同步：进度→本地、任务卡、次日计划、看板（约 15～40 秒；首次会回填历史日，较久）
+python3 scripts/supervisor.py plan-carry --date 2026-10-15    # 只生成“顺延＋次日计划”，不发消息
 python3 scripts/supervisor.py morning --date 2026-10-16 --force
 python3 scripts/supervisor.py close --date 2026-10-15 --dry-run
 python3 scripts/build_dashboard.py                           # 生成本地看板 docs/dashboard.html
@@ -89,4 +89,4 @@ python3 scripts/build_dashboard.py                           # 生成本地看�
 
 ## 7. 重置某一天
 
-只在確定要重來時做（會導致該日任務被重建）：刪除 `.supervisor/tasks-YYYYMMDD.json` 與 `.supervisor/YYYYMMDD.json`，並自行到 Lark 處理已建的任務。
+只在确定要重来时做（会导致该日任务被重建）：删除 `.supervisor/tasks-YYYYMMDD.json` 与 `.supervisor/YYYYMMDD.json`，并自行到 Lark 处理已建的任务。

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>工作日誌看板</title>
+<title>工作日志看板</title>
 <style>
 :root{--bg:#f6f7f9;--card:#fff;--text:#1d2129;--sub:#5c6370;--line:#e3e6eb;--brand:#f35023;--ok:#00a58c;--ok-bg:#dff6f1;--warn:#b7791f;--warn-bg:#fdf3dc;--bad:#d9363e;--bad-bg:#fde8ea;--info:#2f6fed;--info-bg:#e5eeff;--code:#eef0f4}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161d;--card:#1a1f29;--text:#e6e8ec;--sub:#9aa1ad;--line:#2b323f;--ok:#2fd0b5;--ok-bg:#12332d;--warn:#f0c15b;--warn-bg:#3a2f14;--bad:#ff7a82;--bad-bg:#3d1c20;--info:#7da7ff;--info-bg:#1b2a47;--code:#242b37}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,"PingFang TC","PingFang SC","Microsoft YaHei",sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
 header{background:var(--card);border-bottom:1px solid var(--line);padding:16px}
 .wrap{max-width:1080px;margin:0 auto}
 h1{margin:0;font-size:20px}
@@ -52,20 +52,20 @@ select,input[type=search]{border:1px solid var(--line);background:var(--card);co
 </head>
 <body>
 <header><div class="wrap">
-  <h1>工作日誌看板</h1>
+  <h1>工作日志看板</h1>
   <div class="meta" id="gen"></div>
   <nav id="nav">
-    <button data-v="overview" class="on">概覽</button>
-    <button data-v="progress">進度</button>
-    <button data-v="plans">計畫</button>
-    <button data-v="tasks">任務卡</button>
-    <button data-v="logs">日誌</button>
+    <button data-v="overview" class="on">概览</button>
+    <button data-v="progress">进度</button>
+    <button data-v="plans">计划</button>
+    <button data-v="tasks">任务卡</button>
+    <button data-v="logs">日志</button>
   </nav>
 </div></header>
 <main><div class="wrap" id="view"></div></main>
 <script>
 var DATA = /*__DATA__*/null;
-var ST = {todo:'待辦',doing:'進行中',review:'待驗收',done:'已完成',blocked:'阻塞',cancelled:'已作廢'};
+var ST = {todo:'待办',doing:'进行中',review:'待验收',done:'已完成',blocked:'阻塞',cancelled:'已作废'};
 var STO = ['todo','doing','review','done','blocked','cancelled'];
 var state = {view:'overview', openTask:null, openLog:null, agent:'', task:'', q:''};
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
@@ -109,9 +109,9 @@ function tag(st){return '<span class="tag s-'+st+'">'+(ST[st]||esc(st))+'</span>
 function nextDay(d){var x=new Date(d+'T00:00:00');x.setDate(x.getDate()+1);return x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2)}
 function planFor(d){return DATA.plans.filter(function(p){return p.date===d})[0]}
 function planChip(p){
-  if(!p)return '<span class="tag s-blocked">沒有計畫檔</span>';
+  if(!p)return '<span class="tag s-blocked">没有计划文件</span>';
   var low=p.total_hours<DATA.min_hours, over=p.total_hours>7.5;
-  return (low?'<span class="tag s-blocked">需求不足</span> ':(over?'<span class="tag s-review">超載（>7.5h）</span> ':'<span class="tag s-done">需求充足</span> '))+
+  return (low?'<span class="tag s-blocked">需求不足</span> ':(over?'<span class="tag s-review">超载（>7.5h）</span> ':'<span class="tag s-done">需求充足</span> '))+
     (p.draft?'<span class="tag s-review">草案</span> ':'<span class="tag s-doing">定稿</span> ');
 }
 function overview(){
@@ -122,55 +122,55 @@ function overview(){
   var absent=l.filter(function(x){return x.absent});
   var pg=DATA.progress[ds], tp=planFor(tmr), cp=planFor(ds);
   var h='<div class="grid">'+
-   '<div class="card"><div class="num">'+(pg?pg.main_done+' / '+pg.main_total:'—')+'</div><div class="lbl">今日主任務（Lark 勾選）</div>'+
-     '<div class="bar"><i style="width:'+(pg?pct(pg.main_done,pg.main_total):0)+'%"></i></div><div class="meta">'+(pg?('子任務 '+pg.sub_done+' / '+pg.sub_total+' ｜ 同步於 '+esc(pg.updated)):'今日尚無同步')+'</div></div>'+
-   '<div class="card"><div class="num">'+(tp?tp.total_hours+'h':'—')+'</div><div class="lbl">明日計畫工時（下限 '+DATA.min_hours+'h）</div><div class="meta" style="margin-top:6px">'+planChip(tp)+(tp?'':'')+'</div></div>'+
-   '<div class="card"><div class="num">'+todayLogs+'</div><div class="lbl">今日日誌（'+ds+'）</div></div>'+
-   '<div class="card"><div class="num" style="color:'+(absent.length?'var(--bad)':'inherit')+'">'+absent.length+'</div><div class="lbl">旷工記錄</div></div>'+
+   '<div class="card"><div class="num">'+(pg?pg.main_done+' / '+pg.main_total:'—')+'</div><div class="lbl">今日主任务（Lark 勾选）</div>'+
+     '<div class="bar"><i style="width:'+(pg?pct(pg.main_done,pg.main_total):0)+'%"></i></div><div class="meta">'+(pg?('子任务 '+pg.sub_done+' / '+pg.sub_total+' ｜ 同步于 '+esc(pg.updated)):'今日尚无同步')+'</div></div>'+
+   '<div class="card"><div class="num">'+(tp?tp.total_hours+'h':'—')+'</div><div class="lbl">明日计划工时（下限 '+DATA.min_hours+'h）</div><div class="meta" style="margin-top:6px">'+planChip(tp)+(tp?'':'')+'</div></div>'+
+   '<div class="card"><div class="num">'+todayLogs+'</div><div class="lbl">今日日志（'+ds+'）</div></div>'+
+   '<div class="card"><div class="num" style="color:'+(absent.length?'var(--bad)':'inherit')+'">'+absent.length+'</div><div class="lbl">旷工记录</div></div>'+
    '</div>';
   if(tp&&tp.total_hours<DATA.min_hours){
     var ak=DATA.asks[tmr];
-    h+='<div class="card" style="margin-bottom:16px;border-color:var(--bad)"><b>明日需求不足</b>：已排 '+tp.items.length+' 項、約 '+tp.total_hours+'h，低於下限 '+DATA.min_hours+'h。'+
-       (ak?'監工已在 Lark 要過 '+ak.count+' 次需求。':'監工還沒要過需求。')+'<div class="meta">補法：回覆 Lark 的「需求不足」卡片（每行一條，可寫 2h）／在 tasks/ 新增任務卡（寫 est_hours）／讓 agent 寫 plans/'+tmr+'.json</div></div>';
+    h+='<div class="card" style="margin-bottom:16px;border-color:var(--bad)"><b>明日需求不足</b>：已排 '+tp.items.length+' 项、约 '+tp.total_hours+'h，低于下限 '+DATA.min_hours+'h。'+
+       (ak?'监工已在 Lark 要过 '+ak.count+' 次需求。':'监工还没要过需求。')+'<div class="meta">补法：回复 Lark 的“需求不足”卡片（每行一条，可写 2h）／在 tasks/ 新增任务卡（写 est_hours）／让 agent 写 plans/'+tmr+'.json</div></div>';
   }
   if(DATA.needs.length){
-    h+='<div class="card" style="margin-bottom:16px"><b>你補充的需求</b>（已併入計畫）：'+DATA.needs.map(function(n){return esc(n.title)+'（'+n.est_hours+'h → '+esc(n.target)+'）'}).join('、')+'</div>';
+    h+='<div class="card" style="margin-bottom:16px"><b>你补充的需求</b>（已并入计划）：'+DATA.needs.map(function(n){return esc(n.title)+'（'+n.est_hours+'h → '+esc(n.target)+'）'}).join('、')+'</div>';
   }
-  h+='<div class="card" style="margin-bottom:16px"><div class="row">任務卡：'+STO.map(function(s){return tag(s)+' '+cnt[s]}).join(' &nbsp; ')+'</div></div>';
-  if(cp){h+='<h3>今日計畫 '+planChip(cp)+'</h3>'+planTable(cp)}
-  if(tp){h+='<h3>明日計畫 '+planChip(tp)+'</h3>'+planTable(tp)}
-  h+='<h3>任務卡</h3>';
-  if(!t.length)h+='<div class="empty">還沒有任務卡（tasks/）</div>';
+  h+='<div class="card" style="margin-bottom:16px"><div class="row">任务卡：'+STO.map(function(s){return tag(s)+' '+cnt[s]}).join(' &nbsp; ')+'</div></div>';
+  if(cp){h+='<h3>今日计划 '+planChip(cp)+'</h3>'+planTable(cp)}
+  if(tp){h+='<h3>明日计划 '+planChip(tp)+'</h3>'+planTable(tp)}
+  h+='<h3>任务卡</h3>';
+  if(!t.length)h+='<div class="empty">还没有任务卡（tasks/）</div>';
   t.forEach(function(x){
     h+='<div class="item" data-task="'+esc(x.file)+'"><div class="row"><span class="t">'+esc(x.id)+' '+esc(x.title)+'</span>'+tag(x.status)+
-       (x.progress?'<span class="meta">Lark 進度 '+esc(x.progress)+'</span>':'')+
+       (x.progress?'<span class="meta">Lark 进度 '+esc(x.progress)+'</span>':'')+
        (x.due?'<span class="meta">截止 '+esc(x.due)+'</span>':'')+'</div>'+
-       '<div class="meta">驗收項 '+x.done+' / '+x.total+(x.owner?' ｜ 負責：'+esc(x.owner):'')+'</div></div>';
+       '<div class="meta">验收项 '+x.done+' / '+x.total+(x.owner?' ｜ 负责：'+esc(x.owner):'')+'</div></div>';
   });
-  h+='<h3>最近日誌</h3>';
-  if(!l.length)h+='<div class="empty">還沒有日誌（worklog/）</div>';
+  h+='<h3>最近日志</h3>';
+  if(!l.length)h+='<div class="empty">还没有日志（worklog/）</div>';
   l.slice(0,5).forEach(function(x){h+=logItem(x)});
-  if(absent.length){h+='<h3>旷工記錄</h3>';absent.forEach(function(x){h+=logItem(x)})}
+  if(absent.length){h+='<h3>旷工记录</h3>';absent.forEach(function(x){h+=logItem(x)})}
   return h;
 }
 function planTable(p){
-  if(!p.items.length)return '<div class="empty">這份計畫沒有任何項目</div>';
-  var h='<div class="card"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><tr><th align="left">時段</th><th align="left">任務</th><th align="left">估時</th><th align="left">子任務</th><th align="left">備註</th></tr>';
+  if(!p.items.length)return '<div class="empty">这份计划没有任何项目</div>';
+  var h='<div class="card"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><tr><th align="left">时段</th><th align="left">任务</th><th align="left">估时</th><th align="left">子任务</th><th align="left">备注</th></tr>';
   p.items.forEach(function(i){
-    var note=[];if(i.carried)note.push('順延'+(i.reason?'：'+esc(i.reason):''));if(i.req)note.push('你補充的需求');
+    var note=[];if(i.carried)note.push('顺延'+(i.reason?'：'+esc(i.reason):''));if(i.req)note.push('你补充的需求');
     h+='<tr><td>'+esc(i.slot)+'</td><td>'+(i.ref?'['+esc(i.ref)+'] ':'')+esc(i.title)+'</td><td>'+i.est_hours+'h</td><td>'+i.subs+'</td><td>'+note.join('；')+'</td></tr>';
   });
-  h+='</table><div class="meta" style="margin-top:6px">合計 '+p.total_hours+'h ｜ 來源：'+esc(p.generated_by)+(p.deferred.length?' ｜ 未排入：'+esc(p.deferred.join('、')):'')+'</div></div>';
+  h+='</table><div class="meta" style="margin-top:6px">合计 '+p.total_hours+'h ｜ 来源：'+esc(p.generated_by)+(p.deferred.length?' ｜ 未排入：'+esc(p.deferred.join('、')):'')+'</div></div>';
   return h;
 }
 function progressView(){
   var days=Object.keys(DATA.progress).sort().reverse();
-  if(!days.length)return '<div class="empty">還沒有進度同步。執行 scripts/supervisor.py sync 或等排程。</div>';
+  if(!days.length)return '<div class="empty">还没有进度同步。执行 scripts/supervisor.py sync 或等定时任务。</div>';
   var h='';
   days.forEach(function(d){
     var g=DATA.progress[d];
-    h+='<h3>'+esc(d)+' '+(g.absent?'<span class="tag s-absent">旷工</span> ':'')+'<span class="tag '+(g.main_done===g.main_total?'s-done':'s-doing')+'">'+g.main_done+' / '+g.main_total+' 主任務</span> <span class="meta">子任務 '+g.sub_done+' / '+g.sub_total+' ｜ 催促 '+g.reminders+' 次 ｜ 同步於 '+esc(g.updated)+'</span></h3>';
-    h+='<div class="card"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><tr><th align="left">狀態</th><th align="left">時段</th><th align="left">任務</th><th align="left">子任務</th><th align="left">你寫的原因</th></tr>';
+    h+='<h3>'+esc(d)+' '+(g.absent?'<span class="tag s-absent">旷工</span> ':'')+'<span class="tag '+(g.main_done===g.main_total?'s-done':'s-doing')+'">'+g.main_done+' / '+g.main_total+' 主任务</span> <span class="meta">子任务 '+g.sub_done+' / '+g.sub_total+' ｜ 催促 '+g.reminders+' 次 ｜ 同步于 '+esc(g.updated)+'</span></h3>';
+    h+='<div class="card"><table style="width:100%;border-collapse:collapse;font-size:13.5px"><tr><th align="left">状态</th><th align="left">时段</th><th align="left">任务</th><th align="left">子任务</th><th align="left">你写的原因</th></tr>';
     g.items.forEach(function(i){
       h+='<tr><td>'+(i.completed?'✅':'⬜')+'</td><td>'+esc(i.slot||'')+'</td><td>'+(i.ref?'['+esc(i.ref)+'] ':'')+esc(i.title)+'</td><td>'+i.subs_done+'/'+i.subs_total+'</td><td>'+esc((i.reasons||[]).join('；'))+'</td></tr>';
     });
@@ -179,8 +179,8 @@ function progressView(){
   return h;
 }
 function plansView(){
-  if(!DATA.plans.length)return '<div class="empty">還沒有計畫檔（plans/）</div>';
-  var h='<div class="meta" style="margin-bottom:8px">工時下限 '+DATA.min_hours+'h；低於下限的日子會在 Lark 主動要需求。</div>';
+  if(!DATA.plans.length)return '<div class="empty">还没有计划文件（plans/）</div>';
+  var h='<div class="meta" style="margin-bottom:8px">工时下限 '+DATA.min_hours+'h；低于下限的日子会在 Lark 主动要需求。</div>';
   DATA.plans.forEach(function(p){
     h+='<h3>'+esc(p.date)+(p.date===DATA.today?'（今日）':'')+' '+planChip(p)+'</h3>'+planTable(p);
   });
@@ -196,9 +196,9 @@ function tasksView(){
   if(state.openTask){
     var x=DATA.tasks.filter(function(t){return t.file===state.openTask})[0];
     if(x)return '<span class="back" id="back">← 返回</span><div class="card" style="margin-bottom:12px"><div class="row"><b>'+esc(x.id)+' '+esc(x.title)+'</b>'+tag(x.status)+'</div>'+
-      '<div class="bar"><i style="width:'+pct(x.done,x.total)+'%"></i></div><div class="meta">'+x.done+'/'+x.total+' 項驗收 ｜ 截止 '+esc(x.due||'—')+' ｜ 依賴 '+esc(x.blocked_by||'—')+' ｜ 負責 '+esc(x.owner||'—')+'</div></div><div class="doc">'+md(x.body)+'</div>';
+      '<div class="bar"><i style="width:'+pct(x.done,x.total)+'%"></i></div><div class="meta">'+x.done+'/'+x.total+' 项验收 ｜ 截止 '+esc(x.due||'—')+' ｜ 依赖 '+esc(x.blocked_by||'—')+' ｜ 负责 '+esc(x.owner||'—')+'</div></div><div class="doc">'+md(x.body)+'</div>';
   }
-  if(!DATA.tasks.length)return '<div class="empty">還沒有任務卡（tasks/）</div>';
+  if(!DATA.tasks.length)return '<div class="empty">还没有任务卡（tasks/）</div>';
   var h='<div class="cols">';
   STO.forEach(function(s){
     var list=DATA.tasks.filter(function(t){return t.status===s});
@@ -218,17 +218,17 @@ function logsView(){
   var agents={},tasks={};DATA.logs.forEach(function(l){agents[l.agent]=1;tasks[l.task]=1});
   function opts(o,sel){return '<option value="">全部</option>'+Object.keys(o).sort().map(function(k){return '<option'+(k===sel?' selected':'')+'>'+esc(k)+'</option>'}).join('')}
   var h='<div class="filters"><select id="fa">'+opts(agents,state.agent)+'</select><select id="ft">'+opts(tasks,state.task)+'</select>'+
-        '<input type="search" id="fq" placeholder="搜尋日誌內容" value="'+esc(state.q)+'"></div>';
+        '<input type="search" id="fq" placeholder="搜索日志内容" value="'+esc(state.q)+'"></div>';
   var list=DATA.logs.filter(function(l){
     return (!state.agent||l.agent===state.agent)&&(!state.task||l.task===state.task)&&(!state.q||l.body.indexOf(state.q)>=0);
   });
-  if(!list.length)return h+'<div class="empty">沒有符合的日誌</div>';
+  if(!list.length)return h+'<div class="empty">没有符合的日志</div>';
   var last='';
   list.forEach(function(x){if(x.date!==last){h+='<div class="day">'+esc(x.date||'未知日期')+'</div>';last=x.date}h+=logItem(x)});
   return h;
 }
 function render(){
-  document.getElementById('gen').textContent='資料生成於 '+DATA.generated+'（重新執行 scripts/build_dashboard.py 後刷新頁面）';
+  document.getElementById('gen').textContent='数据生成于 '+DATA.generated+'（重新执行 scripts/build_dashboard.py 后刷新页面）';
   Array.prototype.forEach.call(document.querySelectorAll('#nav button'),function(b){b.classList.toggle('on',b.dataset.v===state.view)});
   var v=document.getElementById('view');
   v.innerHTML=state.view==='overview'?overview():state.view==='progress'?progressView():state.view==='plans'?plansView():state.view==='tasks'?tasksView():logsView();

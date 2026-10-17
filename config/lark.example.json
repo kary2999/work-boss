@@ -1,5 +1,5 @@
 {
-  "chat_name": "監工群的名稱（僅供備註）",
+  "chat_name": "监工群的名称（仅供备注）",
   "chat_id": "oc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   "owner_open_id": "ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
   "env_file": "/path/to/.env",
@@ -7,5 +7,5 @@
   "app_secret_key": "FEISHU_APP_SECRET",
   "domain_key": "FEISHU_DOMAIN",
   "min_plan_hours": 4,
-  "note": "只存非敏感標識。密鑰運行時從 env_file 讀取，不得複製進本倉庫。domain 值含 lark 走 open.larksuite.com，否則走 open.feishu.cn"
+  "note": "只存非敏感标识。密钥运行时从 env_file 读取，不得复制进本仓库。domain 值含 lark 走 open.larksuite.com，否则走 open.feishu.cn"
 }

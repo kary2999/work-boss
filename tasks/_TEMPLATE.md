@@ -1,31 +1,31 @@
 ---
 id: T000
-title: 任務標題
+title: 任务标题
 status: todo        # todo | doing | review | done | blocked
-owner:              # 認領者的 agent 標識；未認領留空
-est_hours: 1        # 預估工時（小時）；監工排時段用，缺省按 1
+owner:              # 认领者的 agent 标识；未认领留空
+est_hours: 1        # 预估工时（小时）；监工排时段用，缺省按 1
 branch:             # agent/<agent>/<task-id>
-blocked_by: []      # 依賴的 task-id 或外部事項
+blocked_by: []      # 依赖的 task-id 或外部事项
 created: YYYY-MM-DD
 due: YYYY-MM-DD
 ---
 
-## 目標
+## 目标
 
-一句話說明這個任務要達成什麼。
+一句话说明这个任务要达成什么。
 
-## 範圍（會改動的檔案 / 目錄）
-
-- 
-
-## 不做什麼
+## 范围（会改动的文件 / 目录）
 
 - 
 
-## 驗收標準
+## 不做什么
+
+- 
+
+## 验收标准
 
 - [ ] 
 - [ ] 
 
-## 備註
+## 备注
 
