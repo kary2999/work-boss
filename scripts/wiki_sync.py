@@ -5,6 +5,7 @@
   python3 scripts/wiki_sync.py              同步到 Lark 知识库页面（首次会在配置的父页面下新建子页面）
   python3 scripts/wiki_sync.py --dry-run    只在本地渲染，打印各段 Markdown 的大小，不碰 Lark
   python3 scripts/wiki_sync.py --print      把渲染出的 Markdown 全部打印出来
+  python3 scripts/wiki_sync.py --out 看板.md  写成本地 Markdown 文件，可在 Lark 里“导入”手动使用（没有写权限时的备用办法）
 
 配置（config/lark.json，私有）：
   "wiki": {"space_id": "…", "parent_node_token": "…", "title": "工作日志看板"}
@@ -220,9 +221,15 @@ def main():
     ap = argparse.ArgumentParser(description="把工作日志看板同步到 Lark 知识库")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--print", action="store_true", dest="show")
+    ap.add_argument("--out", help="把渲染好的 Markdown 写成本地文件（可在 Lark 里用“导入”手动贴进去）")
     a = ap.parse_args()
     data = collect()
     chunks = render_chunks(data)
+    if a.out:
+        with open(a.out, "w", encoding="utf-8") as f:
+            f.write("\n\n".join(chunks) + "\n")
+        print("已写入 %s（%d 字）" % (a.out, sum(len(c) for c in chunks)))
+        return 0
     if a.dry_run or a.show:
         for i, c in enumerate(chunks):
             print(("\n----- 第 %d 段 -----\n%s" % (i + 1, c)) if a.show else "第 %2d 段：%5d 字，%d 行" % (i + 1, len(c), c.count("\n") + 1))
