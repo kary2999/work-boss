@@ -10,6 +10,9 @@
   lark_ops.py card --title T [--subtitle S] [--template blue|green|orange|red|grey] --md "markdown"
                    [--footer "小字"] [--button "文字|https://網址"]...   發互動卡片（不產生回調）
   lark_ops.py subtask-create <parent_guid> --summary S [--desc D] [--due "YYYY-MM-DD HH:MM"] [--no-assignee]   建子任務
+  lark_ops.py attach <guid> <檔案>...     把本地檔案（如參考截圖）作為附件上傳到任務
+  lark_ops.py task-attachments <guid>...  列出任務的附件
+  lark_ops.py task-delete <guid>          刪除任務（僅用於清理測試任務）
   lark_ops.py task-update <guid> [--summary S] [--desc D] [--start "…"] [--due "…"]   改標題／描述／起止時間（含子任務）
   lark_ops.py task-comments <guid>...     讀任務評論（使用者在任務裡寫的未完成原因）
   lark_ops.py task-create --summary S [--desc D] [--start "YYYY-MM-DD HH:MM"] [--due "YYYY-MM-DD HH:MM"|YYYY-MM-DD] [--assignee ou_xxx]
@@ -94,6 +97,45 @@ def brief(m):
             "msg_type": m.get("msg_type"), "text": text_of(m)}
 
 
+def upload_attachments(guid, paths, token):
+    """把本地檔案作為附件上傳到 Lark 任務（multipart/form-data）。返回每個檔案的結果。"""
+    import mimetypes
+    import uuid
+    out = []
+    for p in paths:
+        if not os.path.isfile(p):
+            out.append({"file": p, "error": "檔案不存在"})
+            continue
+        boundary = "----workboss" + uuid.uuid4().hex
+        data = open(p, "rb").read()
+        ctype = mimetypes.guess_type(p)[0] or "application/octet-stream"
+        head = ""
+        for k, v in (("resource_type", "task"), ("resource_id", guid)):
+            head += '--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (boundary, k, v)
+        head += '--%s\r\nContent-Disposition: form-data; name="file"; filename="%s"\r\nContent-Type: %s\r\n\r\n' % (
+            boundary, os.path.basename(p), ctype)
+        body = head.encode("utf-8") + data + ("\r\n--%s--\r\n" % boundary).encode()
+        req = urllib.request.Request(BASE + "/open-apis/task/v2/attachments/upload?user_id_type=open_id", data=body, method="POST")
+        req.add_header("Content-Type", "multipart/form-data; boundary=" + boundary)
+        req.add_header("Authorization", "Bearer " + token)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                res = json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            try:
+                res = json.loads(e.read().decode())
+            except Exception:
+                res = {"code": e.code, "msg": str(e)}
+        except Exception as e:
+            res = {"code": -1, "msg": repr(e)}
+        if res.get("code") == 0:
+            items = (res.get("data") or {}).get("items") or []
+            out.append({"file": p, "ok": True, "attachment_guid": (items[0].get("guid") if items else None)})
+        else:
+            out.append({"file": p, "error": "code=%s msg=%s" % (res.get("code"), res.get("msg"))})
+    return out
+
+
 def build_card(title, template, md, footer=None, buttons=None, subtitle=None):
     """卡片 JSON 2.0，只含展示元素與 open_url 按鈕（不產生回調，不需要事件訂閱）。"""
     header = {"title": {"tag": "plain_text", "content": title}, "template": template}
@@ -165,6 +207,24 @@ def main():
             sys.exit("建任務失敗: code=%s msg=%s" % (r.get("code"), r.get("msg")))
         tk = r["data"]["task"]
         print(json.dumps({"guid": tk.get("guid"), "url": tk.get("url")}, ensure_ascii=False))
+        return
+    if a[0] == "attach" and len(a) >= 3:
+        for row in upload_attachments(a[1], a[2:], t):
+            print(json.dumps(row, ensure_ascii=False))
+        return
+    if a[0] == "task-attachments" and len(a) >= 2:
+        for g in a[1:]:
+            r = call("GET", "/open-apis/task/v2/attachments?resource_type=task&resource_id=%s&page_size=50&user_id_type=open_id" % g, token=t)
+            if r.get("code") != 0:
+                print(json.dumps({"guid": g, "error": "code=%s msg=%s" % (r.get("code"), r.get("msg"))}, ensure_ascii=False))
+                continue
+            for it in (r.get("data") or {}).get("items") or []:
+                print(json.dumps({"guid": g, "name": it.get("name"), "size": it.get("size"),
+                                  "attachment_guid": it.get("guid")}, ensure_ascii=False))
+        return
+    if a[0] == "task-delete" and len(a) >= 2:
+        r = call("DELETE", "/open-apis/task/v2/tasks/%s" % a[1], token=t)
+        print(json.dumps({"guid": a[1], "code": r.get("code"), "msg": r.get("msg")}, ensure_ascii=False))
         return
     if a[0] == "chats":
         r = call("GET", "/open-apis/im/v1/chats?page_size=50", token=t)

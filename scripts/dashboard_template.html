@@ -27,6 +27,8 @@ main{padding:16px}
 .s-todo{background:var(--code);color:var(--sub)}.s-doing{background:var(--info-bg);color:var(--info)}
 .s-review{background:var(--warn-bg);color:var(--warn)}.s-done{background:var(--ok-bg);color:var(--ok)}
 .s-blocked{background:var(--bad-bg);color:var(--bad)}.s-absent{background:var(--bad-bg);color:var(--bad)}
+.s-cancelled{background:var(--code);color:var(--sub);text-decoration:line-through}
+.doc img{max-width:260px;border:1px solid var(--line);border-radius:8px}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 .col h3{margin:0 0 8px;font-size:14px}
 .item{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
@@ -63,8 +65,8 @@ select,input[type=search]{border:1px solid var(--line);background:var(--card);co
 <main><div class="wrap" id="view"></div></main>
 <script>
 var DATA = /*__DATA__*/null;
-var ST = {todo:'待辦',doing:'進行中',review:'待驗收',done:'已完成',blocked:'阻塞'};
-var STO = ['todo','doing','review','done','blocked'];
+var ST = {todo:'待辦',doing:'進行中',review:'待驗收',done:'已完成',blocked:'阻塞',cancelled:'已作廢'};
+var STO = ['todo','doing','review','done','blocked','cancelled'];
 var state = {view:'overview', openTask:null, openLog:null, agent:'', task:'', q:''};
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function inline(s){
@@ -85,6 +87,7 @@ function md(src){
     }
     if(code){buf.push(l);continue}
     var m;
+    if((m=l.match(/^!\[([^\]]*)\]\(([^)]+)\)\s*$/))){closeList();out.push('<p><img src="'+esc(m[2])+'" alt="'+esc(m[1])+'"><br><span class="meta">'+esc(m[1])+'</span></p>');continue}
     if((m=l.match(/^(#{1,3})\s+(.*)$/))){closeList();out.push('<h'+m[1].length+'>'+inline(m[2])+'</h'+m[1].length+'>');continue}
     if((m=l.match(/^\s*- \[([ xX])\]\s+(.*)$/))){
       if(!list){out.push('<ul>');list=true}

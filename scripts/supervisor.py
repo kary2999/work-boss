@@ -157,7 +157,7 @@ def set_front(text, key, value):
 
 def card_status(current, done, total):
     """依 Lark 進度推導任務卡 status。只往前走：不降級，不碰 done/blocked，done 必須由人確認。"""
-    if current in ("review", "done", "blocked"):
+    if current in ("review", "done", "blocked", "cancelled"):
         return current
     if total > 0 and done == total:
         return "review"
@@ -180,13 +180,16 @@ def ask_allowed(entry, now, final=False):
     return True
 
 
-def build_next_plan(results, backlog, next_day, cap=DAY_CAP_HOURS, extra=None):
-    """順延未完成項（排最前，沿用原 Lark 任務）+ 使用者主動補充的需求 + backlog，補到工時上限，再排時段。"""
+def build_next_plan(results, backlog, next_day, cap=DAY_CAP_HOURS, extra=None, cancelled=None):
+    """順延未完成項（排最前，沿用原 Lark 任務）+ 使用者主動補充的需求 + backlog，補到工時上限，再排時段。
+    cancelled：已作廢的任務卡 id，其未完成的 Lark 任務不再順延。"""
     carried = []
     for r in results:
         if r["completed"]:
             continue
         ref, title = parse_summary(r["summary"])
+        if cancelled and ref in cancelled:
+            continue
         subs = []
         for s in r.get("subtasks_open", []):
             subs.append({"guid": s["guid"], "title": s["summary"]})
@@ -300,10 +303,27 @@ def read_backlog():
             est = float(meta.get("est_hours", "1"))
         except ValueError:
             est = 1.0
+        imgs = [x.strip() for x in meta.get("images", "").split("|") if x.strip()]
         items.append({"id": meta.get("id", os.path.basename(p)), "ref": meta.get("id", ""),
                       "title": meta.get("title", os.path.basename(p)), "est_hours": est,
-                      "done_std": "", "subtasks": subs})
+                      "done_std": "", "subtasks": subs, "images": imgs})
     return items
+
+
+def read_cancelled_refs():
+    """status 為 cancelled 的任務卡 id：已作廢，不再進 backlog，也不再被順延。"""
+    out = set()
+    for p in sorted(glob.glob(os.path.join(TASKS, "*.md"))):
+        if os.path.basename(p).startswith("_"):
+            continue
+        m = re.match(r"^---\n(.*?)\n---", open(p, encoding="utf-8").read(), re.S)
+        if not m:
+            continue
+        meta = dict((k.strip(), v.strip().split("#")[0].strip()) for k, _, v in
+                    (ln.partition(":") for ln in m.group(1).splitlines() if ":" in ln))
+        if meta.get("status") == "cancelled" and meta.get("id"):
+            out.add(meta["id"])
+    return out
 
 
 # ---------- Lark 客戶端 ----------
@@ -345,6 +365,9 @@ class LarkCLI(object):
         if "error" in r:
             raise RuntimeError(r["error"])
         return r
+
+    def attach(self, guid, paths):
+        return self._run(["attach", guid] + paths)
 
     def task_get_many(self, guids):
         out = {}
@@ -397,6 +420,10 @@ class DryLark(LarkCLI):
 
     def task_update(self, guid, summary=None, desc=None, start=None, due=None):
         return {"guid": guid, "updated": [self._fake("改任務 %s → %s（%s → %s）" % (guid, summary, start, due))]}
+
+    def attach(self, guid, paths):
+        self._fake("  掛附件 %s → %s" % ([os.path.basename(p) for p in paths], guid))
+        return [{"file": p, "ok": True} for p in paths]
 
     def card(self, title, template, md, subtitle=None, footer=None):
         print("[dry-run] 發卡片 [%s] %s %s\n%s\n-- %s" % (template, title, subtitle or "", md, footer or ""))
@@ -469,6 +496,22 @@ def md_table(rows, header):
     return "\n".join(out)
 
 
+def attach_images(client, guid, images):
+    """把計畫項的參考圖作為附件掛到 Lark 任務。路徑相對倉庫根目錄。
+    單張失敗不影響整體（任務已建好）；返回成功掛上的檔名。"""
+    paths = [p if os.path.isabs(p) else os.path.join(ROOT, p) for p in images]
+    ok = []
+    try:
+        for row in client.attach(guid, paths):
+            if row.get("ok"):
+                ok.append(os.path.basename(row["file"]))
+            else:
+                print("附件失敗：%s %s" % (row.get("file"), row.get("error")), file=sys.stderr)
+    except Exception as e:
+        print("附件上傳異常：%s" % str(e)[:200], file=sys.stderr)
+    return ok
+
+
 def cmd_morning(day, client, dry, force=False):
     _morning_core(day, client, dry, force)
     post_run(day, client, dry, None, "morning")
@@ -504,6 +547,8 @@ def _morning_core(day, client, dry, force=False):
             desc += "完成標準：%s\n" % it["done_std"]
         if it.get("carried"):
             desc += "【順延項】%s\n" % (it.get("carry_reason") or "昨日未完成")
+        if it.get("images"):
+            desc += "參考圖（已作為附件上傳）：%s\n" % "、".join(os.path.basename(p) for p in it["images"])
         desc += HINT
         entry = {"id": it["id"], "summary": summary, "slot": slot_label, "est_hours": it.get("est_hours", 1.0),
                  "done_std": it.get("done_std", ""), "carried": bool(it.get("carried")), "subtasks": []}
@@ -527,6 +572,8 @@ def _morning_core(day, client, dry, force=False):
                 title = s["title"] if isinstance(s, dict) else s
                 st = client.subtask_create(t["guid"], title, due)
                 entry["subtasks"].append({"guid": st["guid"], "summary": title})
+            if it.get("images"):
+                entry["attached"] = attach_images(client, t["guid"], it["images"])
             created += 1
         state.append(entry)
         if not dry:
@@ -664,7 +711,7 @@ def refresh_plan(target, results, client, dry, final=False):
     if existing is not None and existing.get("generated_by") != "supervisor":
         return existing
     needs = [n for n in load_json(p_needs(), {"items": []})["items"] if n["target"] == target]
-    plan = build_next_plan(results, read_backlog(), target, extra=needs)
+    plan = build_next_plan(results, read_backlog(), target, extra=needs, cancelled=read_cancelled_refs())
     plan["draft"] = not final
     if dry:
         print("[dry-run] 將寫 plans/%s.json（%s，約 %sh，%d 項）" % (

@@ -37,6 +37,11 @@ class FakeClient(object):
         self.updated.append((guid, summary, start, due))
         return {"guid": guid}
 
+    def attach(self, guid, paths):
+        self.attached = getattr(self, "attached", [])
+        self.attached.append((guid, paths))
+        return [{"file": p, "ok": True} for p in paths]
+
     def task_get(self, guid):
         return {"guid": guid, "completed": self.completed.get(guid, False)}
 
@@ -147,6 +152,7 @@ class NewPureTests(unittest.TestCase):
         self.assertEqual(sv.card_status("review", 0, 3), "review")  # 不降級
         self.assertEqual(sv.card_status("done", 1, 3), "done")
         self.assertEqual(sv.card_status("blocked", 3, 3), "blocked")
+        self.assertEqual(sv.card_status("cancelled", 3, 3), "cancelled")  # 作廢的卡不被自動改回
 
     def test_ask_allowed_limits_count_and_interval(self):
         now = dt.datetime(2026, 10, 16, 21, 0)
@@ -394,6 +400,53 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(plan["items"][0]["ref"], "T002")
         self.assertTrue(any(x[1].startswith("[T002]") for x in c.created))
         self.assertEqual(c.cards[-1][0], "今日工作項")
+
+    def test_card_images_flow_into_plan_and_get_attached_to_new_tasks(self):
+        with open(os.path.join(sv.TASKS, "S01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nid: S01\ntitle: 切片一\nstatus: todo\nest_hours: 2\nimages: 参考图组/x/一.jpg|参考图组/x/二.jpg\n---\n\n## 驗收標準\n- [ ] 甲\n- [ ] 乙\n")
+        day = "2026-10-17"
+        c = FakeClient()
+        sv.cmd_morning(day, c, dry=False)
+        plan = self._next_plan(day)
+        self.assertEqual(plan["items"][0]["images"], ["参考图组/x/一.jpg", "参考图组/x/二.jpg"])
+        (guid, paths), = c.attached
+        self.assertEqual([os.path.basename(p) for p in paths], ["一.jpg", "二.jpg"])
+        self.assertTrue(all(os.path.isabs(p) for p in paths))  # 相對倉庫根目錄解析成絕對路徑
+        state = json.load(open(os.path.join(sv.SUP, "tasks-20261017.json"), encoding="utf-8"))
+        self.assertEqual(state[0]["attached"], ["一.jpg", "二.jpg"])
+        c2 = FakeClient()
+        sv.cmd_morning(day, c2, dry=False)  # 重跑不重複掛附件
+        self.assertFalse(getattr(c2, "attached", []))
+
+    def test_carried_task_does_not_reattach_images(self):
+        self._plan("2026-10-17", [{"id": "c1", "ref": "S01", "title": "順延", "slot": "09:00-10:00", "est_hours": 1,
+                                   "carried": True, "guid": "old1", "images": ["参考图组/x/一.jpg"]}])
+        c = FakeClient()
+        sv.cmd_morning("2026-10-17", c, dry=False)
+        self.assertFalse(getattr(c, "attached", []))
+
+    def test_attach_failure_does_not_break_morning(self):
+        class Boom(FakeClient):
+            def attach(self, guid, paths):
+                raise RuntimeError("上傳失敗")
+        self._plan("2026-10-17", [{"id": "n1", "title": "新", "slot": "09:00-10:00", "est_hours": 1,
+                                   "images": ["参考图组/x/一.jpg"]}])
+        c = Boom()
+        sv.cmd_morning("2026-10-17", c, dry=False)
+        self.assertEqual(len(c.created), 1)  # 任務照常建立
+        self.assertEqual(c.cards[-1][0], "今日工作項")
+
+    def test_cancelled_cards_are_not_carried_nor_backlogged(self):
+        self._card("T002", status="cancelled", est=3)
+        self._card("T003", status="todo", est=2)
+        self.assertEqual(sv.read_cancelled_refs(), {"T002"})
+        self.assertEqual([b["ref"] for b in sv.read_backlog()], ["T003"])
+        res = [{"id": "a", "guid": "g1", "summary": "[T002] 09:00–10:00 作廢的", "est_hours": 3, "completed": False,
+                "reasons": [], "subtasks_open": []},
+               {"id": "b", "guid": "g2", "summary": "[T001] 10:00–11:00 要順延的", "est_hours": 1, "completed": False,
+                "reasons": [], "subtasks_open": []}]
+        plan = sv.build_next_plan(res, [], "2026-10-18", cancelled={"T002"})
+        self.assertEqual([i["ref"] for i in plan["items"]], ["T001"])
 
     def test_morning_with_nothing_to_do_says_so_and_asks(self):
         os.environ["WORK_BOSS_MIN_HOURS"] = "4"
