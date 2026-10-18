@@ -2,6 +2,7 @@
 """把需求池 requirements/pool.json 生成成自包含的平铺页面 docs/pool.html（离线可开，无外部依赖）。
 
 用法：python3 scripts/build_pool.py [--src requirements/pool.json] [--out docs/pool.html]
+      python3 scripts/build_pool.py --tasks     开发任务页（requirements/dev_tasks.json → docs/dev-tasks.html）
 数据格式见 docs/data-contract.md 的“需求池”一节。需求池与生成的页面都是私有文件，不入库。
 """
 import argparse
@@ -35,6 +36,8 @@ def validate(pool):
             errs.append("%s pri 非法：%s" % (r, i.get("pri")))
         if i.get("status", "pool") not in STATUS:
             errs.append("%s status 非法：%s" % (r, i.get("status")))
+        if "est" in i and not (isinstance(i["est"], (int, float)) and 0 < i["est"] <= 10):
+            errs.append("%s est 应为 0~10 的人天数：%s" % (r, i.get("est")))
         for d in i.get("deps", []):
             if d not in idset:
                 errs.append("%s 的依赖 %s 不存在" % (r, d))
@@ -68,7 +71,11 @@ def main():
     ap = argparse.ArgumentParser(description="生成需求池平铺页面")
     ap.add_argument("--src", default=os.path.join(ROOT, "requirements", "pool.json"))
     ap.add_argument("--out", default=os.path.join(ROOT, "docs", "pool.html"))
+    ap.add_argument("--tasks", action="store_true", help="改为生成开发任务页：requirements/dev_tasks.json → docs/dev-tasks.html")
     a = ap.parse_args()
+    if a.tasks:
+        a.src = os.path.join(ROOT, "requirements", "dev_tasks.json")
+        a.out = os.path.join(ROOT, "docs", "dev-tasks.html")
     with open(a.src, encoding="utf-8") as f:
         pool = json.load(f)
     errs = validate(pool)
@@ -80,7 +87,7 @@ def main():
     with open(a.out, "w", encoding="utf-8") as f:
         f.write(build(pool, tpl))
     n = len(pool["items"])
-    print("已生成 %s（%d 条需求）" % (a.out, n))
+    print("已生成 %s（%d 条）" % (a.out, n))
     return 0
 
 

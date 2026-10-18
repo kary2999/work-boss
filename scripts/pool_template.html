@@ -137,7 +137,7 @@ function renderFilters(){
     g.appendChild(chip(p[1],F.group===p[0],function(){F.group=p[0];update()}))});
 }
 function anyOn(o){return Object.keys(o).some(function(k){return o[k]})}
-function text(i){return [i.id,i.title,i.what,i.module,(i.accept||[]).join(' '),(i.open||[]).join(' '),i.prd,(i.ui||[]).join(' ')].join(' ').toLowerCase()}
+function text(i){return [i.id,i.req||'',i.req_title||'',(i.pre||[]).join(' '),i.title,i.what,i.module,(i.accept||[]).join(' '),(i.open||[]).join(' '),i.prd,(i.ui||[]).join(' ')].join(' ').toLowerCase()}
 function filtered(){
   var q=F.q.trim().toLowerCase();
   return items.filter(function(i){
@@ -152,11 +152,11 @@ function cardHtml(i){
   var open=(i.open||[]).length;
   return '<div class="card'+(SEL[i.id]?' sel':'')+(st(i)==='out'?' out':'')+'" tabindex="0" role="button" data-id="'+esc(i.id)+'" style="--sidec:'+SIDEC[i.side]+'" aria-label="'+esc(i.id+' '+i.title)+'">'+
    '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span>'+
-   '<span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+(i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">'+esc(i.size)+'</span>':'')+
+   '<span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+(i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">'+esc(i.size)+'</span>':'')+(i.est!=null?'<span class="tag" style="color:var(--sub)">'+i.est+' 天</span>':'')+(i.req?'<span class="tag" style="color:var(--accent)" title="'+esc(i.req_title||'')+'">'+esc(i.req)+'</span>':'')+
    '<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>'+(i.kind==='decision'?'<span class="tag" style="color:var(--p1)">待决策</span>':'')+(i.owner?'<span class="tag" style="color:var(--accent)">'+esc(i.owner)+'</span>':'')+(st(i)!=='pool'?'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>':'')+
    '<label class="pick"><span class="sr">选择 '+esc(i.id)+'</span><input type="checkbox" data-pick="'+esc(i.id)+'"'+(SEL[i.id]?' checked':'')+'></label></div>'+
    '<div class="t">'+esc(i.title)+'</div><div class="what">'+esc(i.what)+'</div>'+
-   '<div class="meta"><span>'+esc(i.module)+'</span>'+(i.prd?'<span>PRD '+esc(i.prd)+'</span>':'')+((i.deps||[]).length?'<span>依赖 '+i.deps.length+'</span>':'')+
+   '<div class="meta"><span>'+esc(i.module)+'</span>'+(i.prd?'<span>PRD '+esc(i.prd)+'</span>':'')+((i.deps||[]).length?'<span>依赖 '+i.deps.length+'</span>':'')+((i.pre||[]).length?'<span>前置 '+esc(i.pre.join('、'))+'</span>':'')+
    (open?'<span class="openq">待确认 '+open+'</span>':'')+'</div></div>';
 }
 var WAVE={};
@@ -165,14 +165,14 @@ var WAVE={};
   items.forEach(function(i){w(i.id,{})})})();
 var DAYS={S:1,M:2.5,L:4};
 function renderLanes(list){
-  var dirs=['FE','BE','PM'], by={};
+  var dirs=POOL.lanes||['FE','BE','PM'], by={};
   dirs.forEach(function(d){by[d]=list.filter(function(i){return i.side===d&&st(i)!=='out'}).sort(function(a,b){return WAVE[a.id]-WAVE[b.id]||(a.id<b.id?-1:1)})});
   var rest=list.filter(function(i){return dirs.indexOf(i.side)<0||st(i)==='out'});
   var h='<div class="lanes">'+dirs.map(function(d){
-    var l=by[d], days=l.reduce(function(a,i){return a+(DAYS[i.size]||0)},0), last=0, body='';
+    var l=by[d], days=l.reduce(function(a,i){return a+(i.est!=null?i.est:(DAYS[i.size]||0))},0), last=0, body='';
     l.forEach(function(i){ if(WAVE[i.id]!==last){last=WAVE[i.id];body+='<div class="wave">批次 '+last+(last===1?'（可先开工）':'（依赖前面批次）')+'</div>'} body+=cardHtml(i)});
-    return '<div class="lane" style="--sidec:'+SIDEC[d]+'"><div class="lh">'+esc(SIDE[d])+' · '+l.length+' 条<small>初估约 '+days+' 人天（S=1、M=2.5、L=4 的粗算，待研发评估）</small></div>'+(body||'<div class="empty">无</div>')+'</div>'}).join('')+'</div>';
-  if(rest.length)h+='<div class="strip"><div class="group">测试 / 本期不做<small>'+rest.length+' 条，不属于三个方向；测试随功能验收</small></div><div class="grid">'+rest.map(cardHtml).join('')+'</div></div>';
+    return '<div class="lane" style="--sidec:'+SIDEC[d]+'"><div class="lh">'+esc(SIDE[d])+' · '+l.length+' 条<small>初估约 '+days+' 人天'+(POOL.lanes?'（估时之和，未计并行）':'（S=1、M=2.5、L=4 的粗算，待研发评估）')+'</small></div>'+(body||'<div class="empty">无</div>')+'</div>'}).join('')+'</div>';
+  if(rest.length)h+='<div class="strip"><div class="group">其他 / 本期不做<small>'+rest.length+' 条，不属于上面的方向</small></div><div class="grid">'+rest.map(cardHtml).join('')+'</div></div>';
   return h}
 function groupsOf(list){
   if(F.group==='flat')return [{name:'',list:list}];
@@ -193,9 +193,10 @@ function render(){
 function stats(){
   var act=items.filter(function(i){return st(i)!=='out'});
   function n(f){return act.filter(f).length}
-  var h=[['需求总数',act.length],['前端',n(function(i){return i.side==='FE'})],['后端',n(function(i){return i.side==='BE'})],['测试',n(function(i){return i.side==='QA'})],
-    ['产品原型',n(function(i){return i.side==='PM'})],['P0',n(function(i){return i.pri==='P0'})],['有待确认项',n(function(i){return (i.open||[]).length>0})],
-    ['本期不做',items.length-act.length]];
+  var isTask=!!POOL.lanes, est=act.reduce(function(a,i){return a+(i.est||0)},0);
+  var h=[[isTask?'任务总数':'需求总数',act.length]].concat(['FE','BE','PM','QA'].map(function(k){return [SIDE[k],n(function(i){return i.side===k})]}).filter(function(x){return x[1]>0}))
+    .concat(isTask?[['估时合计（人天）',est]]:[]).concat([['P0',n(function(i){return i.pri==='P0'})],['有待确认项',n(function(i){return (i.open||[]).length>0})]])
+    .concat(items.length-act.length?[['本期不做',items.length-act.length]]:[]);
   document.getElementById('stats').innerHTML=h.map(function(x){return '<div class="stat"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>'}).join('');
 }
 function depChip(id){var d=byId[id];return '<button class="chip dep" type="button" data-go="'+esc(id)+'">'+esc(id+(d?' '+d.title:''))+'</button>'}
@@ -204,11 +205,11 @@ function detailHtml(i){
   return '<div class="top"><span class="id">'+esc(i.id)+'</span><span class="tag" style="color:'+SIDEC[i.side]+'">'+esc(SIDE[i.side])+'</span><span class="tag" style="color:'+PRIC[i.pri]+'">'+esc(i.pri)+'</span>'+
     (i.size&&i.size!=='—'?'<span class="tag" style="color:var(--sub)">初估 '+esc(i.size)+'</span>':'')+'<span class="tag" style="color:var(--sub)">'+esc(STL[st(i)])+'</span>'+'<span class="tag" style="color:var(--sub)">批次 '+WAVE[i.id]+'</span>'+(i.owner?'<span class="tag" style="color:var(--accent)">负责：'+esc(i.owner)+'</span>':'')+'</div>'+
     '<h2>'+esc(i.title)+'</h2><div class="sub">'+esc(i.module)+(i.prd?' · PRD '+esc(i.prd):'')+'</div>'+
-    '<h3>需求说明</h3><div class="what" style="display:block;color:var(--ink)">'+esc(i.what)+'</div>'+
+    (i.req?'<h3>所属需求</h3><div>'+esc(i.req+' '+(i.req_title||''))+'</div>':'')+(i.est!=null?'<h3>估时</h3><div>'+i.est+' 人天（初估）</div>':'')+'<h3>需求说明</h3><div class="what" style="display:block;color:var(--ink)">'+esc(i.what)+'</div>'+
     ((i.accept||[]).length?'<h3>验收标准</h3><ul>'+i.accept.map(function(a){return '<li>'+esc(a)+'</li>'}).join('')+'</ul>':'')+
     ((i.open||[]).length?'<h3>待确认</h3>'+i.open.map(function(o){return '<div class="openq" style="margin-bottom:6px">'+esc(o)+'</div>'}).join(''):'')+
     ((i.ui||[]).length?'<h3>对应 UI 稿画板</h3><ul>'+i.ui.map(function(u){return '<li>'+esc(u)+'</li>'}).join('')+'</ul>'+(src.UI?'<div class="sub" style="margin-top:6px"><a href="'+esc(src.UI)+'" target="_blank" rel="noopener">打开 UI 稿</a></div>':''):'')+
-    ((i.deps||[]).length?'<h3>前置依赖</h3>'+i.deps.map(depChip).join(''):'')+
+    ((i.pre||[]).length?'<h3>前置原型 / 决策 / 设计</h3><ul>'+i.pre.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':'')+((i.deps||[]).length?'<h3>前置依赖</h3>'+i.deps.map(depChip).join(''):'')+
     (dependents.length?'<h3>被这些需求依赖</h3>'+dependents.map(function(x){return depChip(x.id)}).join(''):'')+
     '<div style="margin-top:20px"><button class="btn" id="dClose">关闭（Esc）</button></div>';
 }

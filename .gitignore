@@ -15,6 +15,7 @@ requirements/*
 # ---- 示范项目的产出（不是监工系统本身）----
 docs/dashboard.html
 docs/pool.html
+docs/dev-tasks.html
 docs/axure-master-library-plan.html
 docs/three-day-plan.html
 docs/master-spec.html

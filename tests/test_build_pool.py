@@ -34,6 +34,12 @@ class ValidateTests(unittest.TestCase):
         self.assertEqual(len(errs), 3)
 
 
+    def test_est_range(self):
+        self.assertEqual(bp.validate({"items": [item("T1", est=1.5)]}), [])
+        self.assertTrue(bp.validate({"items": [item("T1", est=0)]}))
+        self.assertTrue(bp.validate({"items": [item("T1", est="2")]}))
+
+
 class BuildTests(unittest.TestCase):
     def test_embeds_and_escapes_script_end(self):
         html = bp.build({"items": [item("R01", what="</script><b>")]}, "var P=/*__POOL__*/null;")
